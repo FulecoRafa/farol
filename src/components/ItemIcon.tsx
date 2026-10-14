@@ -8,6 +8,13 @@ const FALLBACK: Record<string, string> = {
   clipboard: "clipboard-text",
   emoji: "smiley",
   farol: "lighthouse",
+  files: "file",
+  hotkeys: "keyboard",
+  kill: "skull",
+  search: "magnifying-glass",
+  timers: "timer",
+  web: "globe",
+  windows: "app-window",
 };
 
 /**

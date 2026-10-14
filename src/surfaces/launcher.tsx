@@ -25,6 +25,9 @@ const MODES: Record<string, [string, string]> = {
   "=": ["calculator", "calculadora"],
   ":": ["smiley", "emoji"],
   ">": ["clipboard-text", "área de transferência"],
+  "/": ["file-magnifying-glass", "arquivos"],
+  "!": ["skull", "encerrar janelas"],
+  "?": ["globe", "web"],
 };
 
 interface Row {
@@ -112,7 +115,7 @@ export default function Launcher() {
       <Icon name={() => mode()?.[0] ?? "magnifying-glass"} size={20} color="$textMuted" />
       <Input
         value={() => farol.results().text}
-        placeholder="buscar apps, calcular, = conta, : emoji…"
+        placeholder="buscar…   = conta · : emoji · / arquivos · > clipboard · ! janelas · ? web"
         size={17}
         autofocus
         onChange={(e) => farol.search(e.value)}
@@ -141,6 +144,8 @@ export default function Launcher() {
         radius={12}
         bg={() => (index() === r.index ? "$raised" : "#00000000")}
         hoverBg="$hover"
+        drag={r.item.path || undefined}
+        onDragStart={r.item.path ? farol.hide : undefined}
         onClick={() => (index() === r.index ? run(r.item, r.item.actions?.[0]?.id ?? "") : select(r.index))}
       >
         <ItemIcon item={r.item} size={26} />
