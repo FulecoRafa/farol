@@ -1,0 +1,19 @@
+{
+  // Editor and type-check only: tessela transpiles the sources itself.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment",
+    "strict": true,
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": [],
+    "skipLibCheck": true,
+    // Packages declared in tessela.toml [imports].
+    "paths": { "@kit/*": ["../adwaita-shell/kit/*"] }
+  },
+  "include": ["../adwaita-shell/types/*.d.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

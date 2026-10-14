@@ -1,0 +1,20 @@
+# farol: a launcher on tessela. One surface (the window); everything it
+# finds and runs comes from the `farol` service (core/, Rust): apps,
+# calculator, emoji, aliases... The components come from adwaita-shell's kit.
+
+name = "farol"
+font = "CaskaydiaCove Nerd Font"
+themes = ["../adwaita-shell/kit/theme.toml"]
+
+[imports]
+kit = "../adwaita-shell/kit"
+
+[surfaces.launcher]
+entry = "src/surfaces/launcher.tsx"
+capabilities = ["context", "timer", "service:farol"]
+
+# The core: one resident process, one socket. Build it first:
+#   cargo build --release --manifest-path core/Cargo.toml
+[plugins.core]
+command = ["core/target/release/farol"]
+services = ["farol"]
