@@ -66,6 +66,26 @@ pub(crate) fn describe_bind(b: &DesktopBind) -> String {
     }
 }
 
+/// Keys a combination may end in. Letters, digits and punctuation need a
+/// modifier; function, media and Print keys may go alone.
+const NAMED: &[&str] = &[
+    "space", "return", "enter", "tab", "escape", "backspace", "delete", "insert", "home", "end", "pageup",
+    "pagedown", "prior", "next", "up", "down", "left", "right", "comma", "period", "slash", "backslash",
+    "semicolon", "apostrophe", "grave", "minus", "equal", "bracketleft", "bracketright",
+];
+
+/// `super+alt+space`, `print`, `f5`: something a keyboard can press.
+pub(crate) fn is_combo(keys: &str) -> bool {
+    let mods = ["super", "ctrl", "alt", "shift"];
+    let (modifiers, rest): (Vec<&str>, Vec<&str>) = keys.split('+').partition(|p| mods.contains(p));
+    let [key] = rest.as_slice() else { return false };
+    let alone = key.starts_with("xf86")
+        || *key == "print"
+        || (key.len() >= 2 && key.starts_with('f') && key[1..].parse::<u8>().is_ok_and(|n| (1..=24).contains(&n)));
+    let ok = alone || key.chars().count() == 1 || NAMED.contains(key);
+    ok && (alone || !modifiers.is_empty())
+}
+
 fn arrow(dir: &str) -> &str {
     match dir {
         "l" => "←",
@@ -96,10 +116,15 @@ impl Hotkeys {
         }
     }
 
+    /// The row a shortcut runs, as the engine knows it.
+    fn target(&self, id: &str) -> Option<Item> {
+        self.engine.get().and_then(Weak::upgrade).and_then(|e| e.item(id))
+    }
+
     /// In words: "abrir o farol", "abrir em >", "WhatsApp".
     fn meaning(&self, query: &str) -> String {
         if let Some(id) = query.strip_prefix('@') {
-            let name = self.engine.get().and_then(Weak::upgrade).and_then(|e| e.item(id)).map(|i| i.title);
+            let name = self.target(id).map(|i| i.title);
             return name.unwrap_or_else(|| id.to_string());
         }
         if query.is_empty() { "abrir o farol".into() } else { format!("abrir o farol em “{query}”") }
@@ -116,6 +141,9 @@ impl Hotkeys {
         }
         let mut replaced = self.replaced();
         for (keys, query) in self.db.hotkeys() {
+            if !is_combo(&keys) {
+                continue;
+            }
             match platform::bind_hotkey(&keys, &self.command(&query)) {
                 // Remember the desktop's own bind, not a previous farol one.
                 Ok(Some(prev)) if !prev.arg.contains("FAROL_SOCKET=") => {
@@ -149,18 +177,29 @@ impl Hotkeys {
             .db
             .hotkeys()
             .into_iter()
-            .map(|(keys, query)| Item {
-                id: format!("hotkeys:farol:{keys}"),
-                title: self.meaning(&query),
-                subtitle: match replaced.get(&keys) {
-                    Some(b) => format!("{} · no lugar de “{}”", pretty(&keys), describe_bind(b)),
-                    None => pretty(&keys),
-                },
-                icon: "ph:keyboard".into(),
-                keywords: format!("atalho {keys}"),
-                hint: keys.clone(),
-                actions: vec![Action::new("run", "executar", "enter"), Action::new("remove", "apagar atalho", "ctrl+d")],
-                ..Item::default()
+            .map(|(keys, query)| {
+                // A shortcut to a row looks like that row: its icon and
+                // description, the keys on the right.
+                let target = query.strip_prefix('@').and_then(|id| self.target(id));
+                let about = match &target {
+                    Some(t) if !t.subtitle.is_empty() => t.subtitle.clone(),
+                    Some(_) => "atalho".into(),
+                    None => "farol".into(),
+                };
+                Item {
+                    id: format!("hotkeys:farol:{keys}"),
+                    title: self.meaning(&query),
+                    subtitle: match replaced.get(&keys) {
+                        Some(b) => format!("{about} · no lugar de “{}”", describe_bind(b)),
+                        None => about,
+                    },
+                    icon: target.as_ref().map(|t| t.icon.clone()).filter(|i| !i.is_empty()).unwrap_or_else(|| "ph:keyboard".into()),
+                    glyph: target.as_ref().map(|t| t.glyph.clone()).unwrap_or_default(),
+                    keywords: format!("atalho {keys}"),
+                    hint: pretty(&keys),
+                    actions: vec![Action::new("run", "executar", "enter"), Action::new("remove", "apagar atalho", "ctrl+d")],
+                    ..Item::default()
+                }
             })
             .collect();
         items.extend(
@@ -225,8 +264,19 @@ impl Provider for Hotkeys {
             }
         };
         let keys = normalize_keys(&keys);
-        let has_key = keys.split('+').any(|p| !["super", "ctrl", "alt", "shift"].contains(&p) && !p.is_empty());
-        if !has_key {
+        if !is_combo(&keys) {
+            // `atalho @id zap`: a name, not keys. That is an alias.
+            if let (Some(_), false) = (query.strip_prefix('@'), keys.contains('+')) {
+                *self.pending.borrow_mut() = Some((format!("alias:{keys}"), query.clone()));
+                return vec![Item {
+                    id: "hotkeys:new".into(),
+                    title: format!("“{keys}” abre {}", self.meaning(&query)),
+                    subtitle: "não são teclas: criar pseudônimo".into(),
+                    icon: "ph:at".into(),
+                    actions: vec![Action::new("create", "criar pseudônimo", "enter")],
+                    ..Item::default()
+                }];
+            }
             return Vec::new();
         }
         let taken = self.desktop.borrow().iter().find(|b| b.keys == keys).map(describe_bind);
@@ -250,6 +300,13 @@ impl Provider for Hotkeys {
         let rest = id.strip_prefix("hotkeys:").unwrap_or_default();
         if rest == "new" {
             let Some((keys, query)) = self.pending.borrow_mut().take() else { return Outcome::default() };
+            if let Some(name) = keys.strip_prefix("alias:") {
+                let target = query.trim_start_matches('@');
+                return match self.db.set_alias(name, target) {
+                    Ok(()) => Outcome { query: Some(String::new()), toast: format!("“{name}” criado"), ..Outcome::default() },
+                    Err(e) => Outcome::toast(e.to_string()),
+                };
+            }
             if let Err(e) = self.db.set_hotkey(&keys, &query) {
                 return Outcome::toast(e.to_string());
             }
@@ -319,5 +376,21 @@ mod tests {
         let row = h.generate(&Query { text: "atalho super+v >", scoped: false });
         assert_eq!(row[0].title, "super + v → abrir o farol em “>”");
         assert!(h.generate(&Query { text: "atalho super+alt", scoped: false }).is_empty());
+        assert!(h.generate(&Query { text: "atalho zap", scoped: false }).is_empty());
+        let row = h.generate(&Query { text: "atalho @apps:w zap", scoped: false });
+        assert_eq!(row[0].subtitle, "não são teclas: criar pseudônimo");
+        h.activate("hotkeys:new", "create");
+        assert_eq!(h.db.aliases(), vec![("zap".into(), "apps:w".into())]);
+        assert!(h.db.hotkeys().is_empty());
+    }
+
+    #[test]
+    fn combos() {
+        for ok in ["super+alt+space", "super+q", "print", "f5", "xf86audiomute", "ctrl+slash"] {
+            assert!(is_combo(ok), "{ok}");
+        }
+        for bad in ["zap", "q", "super+zap", "super+alt", "super+q+w", ""] {
+            assert!(!is_combo(bad), "{bad}");
+        }
     }
 }
