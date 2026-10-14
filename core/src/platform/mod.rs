@@ -218,3 +218,13 @@ pub fn utc_offset_secs() -> i64 {
 pub fn utc_offset_secs() -> i64 {
     0
 }
+
+/// A keybinding the desktop already has (Hyprland's binds).
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DesktopBind {
+    /// `super+q`, farol's order.
+    pub keys: String,
+    pub description: String,
+    pub dispatcher: String,
+    pub arg: String,
+}

@@ -391,3 +391,54 @@ pub fn notify(title: &str, body: &str) -> std::io::Result<()> {
         "--hint=string:sound-name:alarm-clock-elapsed", title, body,
     ])
 }
+
+/// The desktop's own keybindings (Hyprland, outside submaps).
+pub fn desktop_binds() -> Vec<super::DesktopBind> {
+    super::hyprland::binds()
+        .into_iter()
+        .filter(|b| b.submap.is_empty() && !b.key.is_empty())
+        .map(|b| super::DesktopBind {
+            keys: super::hyprland::join_keys(b.mods, &b.key),
+            description: b.description,
+            dispatcher: b.dispatcher,
+            arg: b.arg,
+        })
+        .collect()
+}
+
+pub fn has_hotkeys() -> bool {
+    super::hyprland::present()
+}
+
+/// Bind `keys` to a shell command, replacing whatever had them (returned,
+/// to restore later). Runtime only: a config reload drops it, so farol
+/// binds again on `configreloaded`.
+pub fn bind_hotkey(keys: &str, command: &str) -> std::io::Result<Option<super::DesktopBind>> {
+    let (mods, key) = super::hyprland::split_keys(keys).ok_or_else(|| std::io::Error::other("falta a tecla"))?;
+    let previous = desktop_binds().into_iter().find(|b| b.keys == keys);
+    let spec = super::hyprland::bind_spec(mods, &key);
+    let _ = super::hyprland::keyword(&format!("unbind {spec}"));
+    super::hyprland::keyword(&format!("bind {spec},exec,{command}"))?;
+    Ok(previous)
+}
+
+/// Undo [`bind_hotkey`], putting back what it replaced.
+pub fn unbind_hotkey(keys: &str, restore: Option<&super::DesktopBind>) -> std::io::Result<()> {
+    let (mods, key) = super::hyprland::split_keys(keys).ok_or_else(|| std::io::Error::other("falta a tecla"))?;
+    let spec = super::hyprland::bind_spec(mods, &key);
+    super::hyprland::keyword(&format!("unbind {spec}"))?;
+    if let Some(b) = restore {
+        super::hyprland::keyword(&format!("bind {spec},{},{}", b.dispatcher, b.arg))?;
+    }
+    Ok(())
+}
+
+/// Do what a desktop keybinding does.
+pub fn run_desktop_bind(b: &super::DesktopBind) -> std::io::Result<()> {
+    super::hyprland::dispatch(&format!("{} {}", b.dispatcher, b.arg))
+}
+
+/// Hyprland config reloads (they drop runtime binds).
+pub fn on_desktop_reload(tx: async_channel::Sender<()>) {
+    super::hyprland::on_reload(tx);
+}

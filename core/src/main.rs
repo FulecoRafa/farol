@@ -5,6 +5,8 @@
 //!   farol show [text] | hide
 //!   farol alias NAME TARGET   alias -d NAME   aliases
 //!   farol link NAME URL       link -d NAME    links
+//!   farol hotkey KEYS [TEXT]  hotkey -d KEYS  hotkeys   (applied when farol starts)
+//!   farol run ID [ACTION]     run a row (what a shortcut to a row calls)
 //!   farol set KEY JSON        get KEY         settings
 //!   farol query TEXT          answer a search here (debugging)
 //!
@@ -25,7 +27,7 @@ fn usage() -> ExitCode {
     eprintln!(
         "usage: farol [serve]\n       farol toggle|show [text]   farol hide\n       \
          farol alias NAME TARGET | alias -d NAME | aliases\n       \
-         farol link NAME URL | link -d NAME | links\n       farol set KEY JSON | get KEY | settings"
+         farol link NAME URL | link -d NAME | links\n       farol hotkey KEYS [TEXT] | hotkey -d KEYS | hotkeys   farol run ID [ACTION]\n       farol set KEY JSON | get KEY | settings"
     );
     ExitCode::from(2)
 }
@@ -37,6 +39,7 @@ fn main() -> ExitCode {
         [] | ["serve"] => return service::serve(),
         ["toggle" | "show", rest @ ..] => client::call(words[0], serde_json::json!({ "query": rest.join(" ") })),
         ["hide"] => client::call("hide", serde_json::Value::Null),
+        ["run", id, action @ ..] => client::call("run", serde_json::json!({ "id": id, "action": action.first().copied().unwrap_or("") })),
         ["query", rest @ ..] => query(&rest.join(" ")),
         _ => match offline(&words) {
             Some(r) => r,
@@ -96,6 +99,9 @@ fn offline(words: &[&str]) -> Option<Result<String, String>> {
         ["link", "-d", name] => db.remove_quicklink(name).map(|_| String::new()).map_err(err),
         ["link", name, url] => db.set_quicklink(name, url).map(|_| String::new()).map_err(err),
         ["links"] => Ok(lines(db.quicklinks(), " ")),
+        ["hotkey", "-d", keys] => db.remove_hotkey(keys).map(|_| String::new()).map_err(err),
+        ["hotkey", keys, query @ ..] => db.set_hotkey(keys, &query.join(" ")).map(|_| String::new()).map_err(err),
+        ["hotkeys"] => Ok(lines(db.hotkeys(), " → ")),
         ["set", key, value @ ..] if !value.is_empty() => {
             let text = value.join(" ");
             // Not JSON: take it as a string.

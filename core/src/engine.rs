@@ -9,7 +9,7 @@ use std::rc::Rc;
 use nucleo_matcher::{Config, Matcher};
 
 use crate::db::{Db, now};
-use crate::item::{Item, Outcome, Preview, Section};
+use crate::item::{Action, Item, Outcome, Preview, Section};
 use crate::matching;
 
 /// What a provider sees of the query.
@@ -273,6 +273,13 @@ impl Engine {
                 s.items.retain(|i| !shown.contains(&i.id));
             }
             for item in &mut s.items {
+                // Rows that run something can get an alias and a shortcut.
+                let runs = self.provider(&item.id).is_some_and(|p| p.tracks_usage());
+                for (id, title, key) in [("alias", "criar pseudônimo", "ctrl+a"), ("hotkey", "criar atalho", "ctrl+s")] {
+                    if runs && !item.actions.is_empty() && !item.actions.iter().any(|a| a.id == id) {
+                        item.actions.push(Action::new(id, title, key));
+                    }
+                }
                 if item.hint.is_empty() {
                     if let Some((a, _)) = aliases.iter().find(|(_, t)| *t == item.id) {
                         item.hint = a.clone();
@@ -283,6 +290,11 @@ impl Engine {
     }
 
     pub fn activate(&self, id: &str, action: &str) -> Outcome {
+        match action {
+            "alias" => return Outcome::query(format!("alias @{id} ")),
+            "hotkey" => return Outcome::query(format!("atalho @{id} ")),
+            _ => {}
+        }
         let Some(p) = self.provider(id).cloned() else {
             return Outcome::toast(format!("nada responde por {id}"));
         };

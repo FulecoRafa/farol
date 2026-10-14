@@ -45,7 +45,6 @@ impl Apps {
                 keywords: a.keywords.clone(),
                 actions: vec![
                     Action::new("open", "abrir", "enter"),
-                    Action::new("alias", "criar pseudônimo", "ctrl+a"),
                     Action::new("copy", "copiar comando", "ctrl+c"),
                 ],
                 ..Item::default()
@@ -111,7 +110,6 @@ impl Provider for Apps {
             return Outcome::toast("o app não existe mais");
         };
         match action {
-            "alias" => Outcome::query(format!("alias @{id} ")),
             "copy" => match platform::copy(&app.exec.join(" ")) {
                 Ok(()) => Outcome::close_with("comando copiado"),
                 Err(e) => Outcome::toast(e.to_string()),

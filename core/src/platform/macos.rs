@@ -135,3 +135,27 @@ pub fn notify(title: &str, body: &str) -> std::io::Result<()> {
     let script = format!("display notification \"{}\" with title \"{}\" sound name \"Glass\"", quote(body), quote(title));
     super::spawn(&["osascript", "-e", &script])
 }
+
+// Global hotkeys on this OS are phase 5 of the plan (a native registration,
+// e.g. the `global-hotkey` crate); until then farol has none here.
+pub fn desktop_binds() -> Vec<super::DesktopBind> {
+    Vec::new()
+}
+
+pub fn has_hotkeys() -> bool {
+    false
+}
+
+pub fn bind_hotkey(_keys: &str, _command: &str) -> std::io::Result<Option<super::DesktopBind>> {
+    Err(std::io::Error::other("atalhos globais ainda não existem neste sistema"))
+}
+
+pub fn unbind_hotkey(_keys: &str, _restore: Option<&super::DesktopBind>) -> std::io::Result<()> {
+    Ok(())
+}
+
+pub fn run_desktop_bind(_b: &super::DesktopBind) -> std::io::Result<()> {
+    Ok(())
+}
+
+pub fn on_desktop_reload(_tx: async_channel::Sender<()>) {}

@@ -4,7 +4,7 @@
 //!          results  {seq, text, sections}  the answer to the last `query`
 //!          preview  {id, ...}              the selected row's preview
 //! methods  query {text} · activate {id, action} · preview {id}
-//!          toggle {query} · show {query} · hide
+//!          toggle {query} · show {query} · hide · run {id, action}
 
 use std::process::ExitCode;
 use std::rc::Rc;
@@ -18,7 +18,7 @@ use crate::engine::{Engine, Providers};
 use crate::item::{Preview, Section};
 use crate::platform;
 use crate::providers::{
-    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, timers::Timers,
+    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, hotkeys::Hotkeys, timers::Timers,
     web::{Web, WebSearch}, windows::Windows,
 };
 
@@ -88,6 +88,8 @@ pub struct Core {
     pub clipboard_changed: Rc<dyn Fn()>,
     /// Ends timers: a task to run beside the service.
     pub timers: Rc<Timers>,
+    /// Shortcuts: bound at start and again on desktop config reloads.
+    pub hotkeys: Rc<Hotkeys>,
 }
 
 /// `inline`: no executor around (the `query` command), so background
@@ -98,6 +100,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
     let clipboard = Rc::new(Clipboard::new(db.clone()));
     let timers = Rc::new(Timers::new(db.clone()));
     let web = Rc::new(Web::new(db.clone()));
+    let hotkeys = Rc::new(Hotkeys::new(db.clone()));
     let apps = Rc::new(Apps::new(db.clone()));
     let (switcher, closer) = Windows::pair(apps.clone());
     let providers: Providers = vec![
@@ -108,6 +111,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
         Rc::new(switcher),
         Rc::new(closer),
         web.clone(),
+        hotkeys.clone(),
         Rc::new(Files::new(db.clone(), inline)),
         Rc::new(Emoji::new(db.clone())),
         clipboard.clone(),
@@ -115,6 +119,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
     ];
     let engine = Rc::new(Engine::new(db, providers));
     farol.attach(&engine);
+    hotkeys.attach(&engine);
 
     let mut svc = Service::new("farol");
     let ui = svc.topic("ui", Ui::default());
@@ -196,6 +201,10 @@ pub fn build(inline: bool) -> Result<Core, String> {
         Ok(())
     });
 
+    // A shortcut bound to a row: run it without opening the launcher.
+    let e = engine.clone();
+    svc.method_sync("run", move |a: Activate| Ok(e.activate(&a.id, &a.action)));
+
     let u = ui.clone();
     svc.method_sync("hide", move |_: Value| {
         set_open(&u, false, String::new());
@@ -210,7 +219,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
         }
     });
 
-    Ok(Core { service: svc, engine, clipboard, clipboard_changed, timers })
+    Ok(Core { service: svc, engine, clipboard, clipboard_changed, timers, hotkeys })
 }
 
 pub fn serve() -> ExitCode {
@@ -227,8 +236,19 @@ pub fn serve() -> ExitCode {
     platform::watch_clipboard(core.clipboard.primary(), tx);
     let (clipboard, changed) = (core.clipboard.clone(), core.clipboard_changed.clone());
     let timers = core.timers.clone();
+    let hotkeys = core.hotkeys.clone();
     let record = async move {
         tessela_service::spawn(timers.run()).detach();
+        hotkeys.apply();
+        let (reloaded, on_reload) = async_channel::unbounded();
+        platform::on_desktop_reload(reloaded);
+        let h = hotkeys.clone();
+        tessela_service::spawn(async move {
+            while on_reload.recv().await.is_ok() {
+                h.apply();
+            }
+        })
+        .detach();
         while let Ok(clip) = rx.recv().await {
             clipboard.record(clip);
             changed();
