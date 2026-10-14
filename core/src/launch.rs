@@ -93,6 +93,18 @@ pub fn dev(nested: bool) -> ExitCode {
         run.arg("--nested");
     }
     run.env("FAROL_DB", &db).env("FAROL_PROJECT", "farol-dev");
+    // Stopping `farol dev` (Ctrl+C, a kill) stops the copy too.
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::CommandExt;
+        // SAFETY: prctl only, between fork and exec.
+        unsafe {
+            run.pre_exec(|| {
+                libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
+                Ok(())
+            });
+        }
+    }
     eprintln!("farol dev: {} (banco {})", dir.display(), db.display());
     eprintln!("farol dev: abra com FAROL_PROJECT=farol-dev farol toggle");
     let mut child = match run.spawn() {
