@@ -20,6 +20,23 @@ pub struct Query<'a> {
     pub scoped: bool,
 }
 
+thread_local! {
+    static REFRESH: RefCell<Option<Rc<dyn Fn()>>> = RefCell::new(None);
+}
+
+/// Set by the service: how to answer the current text again.
+pub fn on_refresh(f: Rc<dyn Fn()>) {
+    REFRESH.with(|r| *r.borrow_mut() = Some(f));
+}
+
+/// A provider's background work (a file search) finished: answer the
+/// current text again, keeping the selection.
+pub fn refresh() {
+    if let Some(f) = REFRESH.with(|r| r.borrow().clone()) {
+        f();
+    }
+}
+
 /// A plugin. Most only need `items` (a catalog the engine ranks); those that
 /// compute rows from the text (calculator, timers) implement `generate`.
 pub trait Provider {

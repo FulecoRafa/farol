@@ -16,7 +16,7 @@ use tessela_service::{Host, Service, Topic};
 use crate::db::Store;
 use crate::engine::{Engine, Providers};
 use crate::item::{Preview, Section};
-use crate::providers::{apps::Apps, calc::Calc, emoji::Emoji, farol::Farol};
+use crate::providers::{apps::Apps, calc::Calc, emoji::Emoji, farol::Farol, files::Files};
 
 #[derive(Clone, Default, Serialize)]
 pub struct Ui {
@@ -75,13 +75,16 @@ fn set_open(ui: &Topic<Ui>, open: bool, query: String) {
     });
 }
 
-pub fn build() -> Result<(Service, Rc<Engine>), String> {
+/// The service and its engine. `inline`: no executor around (the `query`
+/// command), so background searches run in place.
+pub fn build(inline: bool) -> Result<(Service, Rc<Engine>), String> {
     let db = Store::open().map_err(|e| format!("{}: {e}", crate::db::path().display()))?;
     let farol = Rc::new(Farol::new(db.clone()));
     let providers: Providers = vec![
         Rc::new(Calc::new()),
         farol.clone(),
         Rc::new(Apps::new(db.clone())),
+        Rc::new(Files::new(db.clone(), inline)),
         Rc::new(Emoji::new(db.clone())),
     ];
     let engine = Rc::new(Engine::new(db, providers));
@@ -96,21 +99,28 @@ pub fn build() -> Result<(Service, Rc<Engine>), String> {
     // starts there).
     let answer = {
         let (e, r, p) = (engine.clone(), results.clone(), preview.clone());
-        Rc::new(move |text: String| {
+        Rc::new(move |text: String, fresh: bool| {
             let sections = e.query(&text);
             let first = sections.first().and_then(|s| s.items.first()).map(|i| i.id.clone());
-            let seq = r.get().seq + 1;
+            let seq = r.get().seq + u64::from(fresh);
             r.publish(Results { seq, text, sections });
-            p.publish(match first {
-                Some(id) => Shown { preview: e.preview(&id), id },
-                None => Shown::default(),
-            });
+            // A late answer fills the preview only if nothing had one yet.
+            if fresh || p.get().id.is_empty() {
+                p.publish(match first {
+                    Some(id) => Shown { preview: e.preview(&id), id },
+                    None => Shown::default(),
+                });
+            }
         })
     };
+    // Late rows (a file search) refresh the same answer: same seq, so the
+    // selection stays where the user put it.
+    let (a, r) = (answer.clone(), results.clone());
+    crate::engine::on_refresh(Rc::new(move || a(r.get().text, false)));
 
     let a = answer.clone();
     svc.method_sync("query", move |t: Text| {
-        a(t.text);
+        a(t.text, true);
         Ok(())
     });
 
@@ -133,7 +143,7 @@ pub fn build() -> Result<(Service, Rc<Engine>), String> {
         let (e, u, a) = (engine.clone(), ui.clone(), answer.clone());
         Rc::new(move |query: String| {
             e.opened();
-            a(query.clone());
+            a(query.clone(), true);
             set_open(&u, true, query);
         })
     };
@@ -168,7 +178,7 @@ pub fn build() -> Result<(Service, Rc<Engine>), String> {
 }
 
 pub fn serve() -> ExitCode {
-    let (svc, _engine) = match build() {
+    let (svc, _engine) = match build(false) {
         Ok(x) => x,
         Err(e) => {
             eprintln!("farol: {e}");
