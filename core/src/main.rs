@@ -10,7 +10,7 @@
 //!   farol link NAME URL       link -d NAME    links
 //!   farol hotkey KEYS [TEXT]  hotkey -d KEYS  hotkeys   (applied when farol starts)
 //!   farol run ID [ACTION]     run a row (what a shortcut to a row calls)
-//!   farol set KEY JSON        get KEY         options
+//!   farol set KEY JSON        get KEY         unset KEY   options
 //!   farol query TEXT          answer a search here (debugging)
 //!   farol serve               the service itself (started by `tessela run`)
 //!
@@ -124,6 +124,7 @@ fn offline(words: &[&str]) -> Option<Result<String, String>> {
             let v = serde_json::from_str(&text).unwrap_or(serde_json::Value::String(text));
             db.set(key, &v).map(|_| String::new()).map_err(err)
         }
+        ["unset", key] => db.unset(key).map(|_| String::new()).map_err(err),
         ["get", key] => Ok(db.setting(key).map(|v| v.to_string()).unwrap_or_default()),
         ["options"] => Ok(db
             .settings()

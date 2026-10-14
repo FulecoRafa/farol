@@ -47,7 +47,6 @@ pub struct Client {
     pub title: String,
     pub pid: i64,
     pub workspace: Workspace,
-    pub floating: bool,
     #[serde(rename = "focusHistoryID")]
     pub focus_history_id: i64,
 }

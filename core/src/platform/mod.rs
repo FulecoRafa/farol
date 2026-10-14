@@ -68,15 +68,6 @@ pub fn spawn<S: AsRef<OsStr>>(argv: &[S]) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Run a shell command line (user-defined actions).
-pub fn shell(line: &str) -> std::io::Result<()> {
-    if cfg!(windows) {
-        spawn(&["cmd", "/C", line])
-    } else {
-        spawn(&["sh", "-c", line])
-    }
-}
-
 /// Run and wait, feeding `input`; for small helpers like `wl-copy`.
 pub fn pipe<S: AsRef<OsStr>>(argv: &[S], input: &[u8]) -> std::io::Result<()> {
     use std::io::Write;

@@ -87,6 +87,7 @@ impl Store {
         Self::with(Connection::open(path)?)
     }
 
+    #[cfg(test)]
     pub fn memory() -> Db {
         Self::with(Connection::open_in_memory().expect("in-memory sqlite")).expect("schema")
     }

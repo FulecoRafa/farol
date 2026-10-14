@@ -140,10 +140,6 @@ impl Engine {
         v
     }
 
-    pub fn providers(&self) -> &Providers {
-        &self.providers
-    }
-
     fn provider(&self, id: &str) -> Option<&Rc<dyn Provider>> {
         let name = id.split(':').next()?;
         self.providers.iter().find(|p| p.id() == name)
