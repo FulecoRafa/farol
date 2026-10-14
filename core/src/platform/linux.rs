@@ -363,7 +363,7 @@ pub fn window_op(window: Option<&super::Window>, op: super::WindowOp) -> std::io
     let target = window.map(|w| format!("address:{}", w.id));
     if let (Kill, Some(w)) = (op, window) {
         // SAFETY: plain kill(2) on a pid Hyprland reported.
-        return match unsafe { libc_kill(w.pid as i32, 9) } {
+        return match unsafe { libc::kill(w.pid as i32, libc::SIGKILL) } {
             0 => Ok(()),
             _ => Err(std::io::Error::last_os_error()),
         };
@@ -384,7 +384,10 @@ pub fn window_op(window: Option<&super::Window>, op: super::WindowOp) -> std::io
     super::hyprland::dispatch(&args)
 }
 
-unsafe extern "C" {
-    #[link_name = "kill"]
-    fn libc_kill(pid: i32, sig: i32) -> i32;
+/// A desktop notification that stays until dismissed (a timer ended).
+pub fn notify(title: &str, body: &str) -> std::io::Result<()> {
+    super::spawn(&[
+        "notify-send", "--app-name=farol", "--urgency=critical", "--icon=alarm-symbolic",
+        "--hint=string:sound-name:alarm-clock-elapsed", title, body,
+    ])
 }

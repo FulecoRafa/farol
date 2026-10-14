@@ -136,3 +136,9 @@ pub fn has_windows() -> bool {
 pub fn window_op(_window: Option<&super::Window>, _op: super::WindowOp) -> std::io::Result<()> {
     Err(std::io::Error::other("window management is not available on this OS yet"))
 }
+
+/// A message box from `msg`, the one notification Windows ships without
+/// extra modules; toasts need an app id (packaging).
+pub fn notify(title: &str, body: &str) -> std::io::Result<()> {
+    super::spawn(&["msg".to_string(), "*".to_string(), format!("{title}: {body}")])
+}

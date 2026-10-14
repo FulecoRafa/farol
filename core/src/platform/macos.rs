@@ -128,3 +128,10 @@ pub fn has_windows() -> bool {
 pub fn window_op(_window: Option<&super::Window>, _op: super::WindowOp) -> std::io::Result<()> {
     Err(std::io::Error::other("window management is not available on this OS yet"))
 }
+
+/// A Notification Center banner, through AppleScript.
+pub fn notify(title: &str, body: &str) -> std::io::Result<()> {
+    let quote = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+    let script = format!("display notification \"{}\" with title \"{}\" sound name \"Glass\"", quote(body), quote(title));
+    super::spawn(&["osascript", "-e", &script])
+}

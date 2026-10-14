@@ -201,3 +201,20 @@ pub enum WindowOp {
     /// Switch to a workspace.
     GoTo(u32),
 }
+
+/// Seconds east of UTC right now, in the local zone.
+#[cfg(unix)]
+pub fn utc_offset_secs() -> i64 {
+    // SAFETY: localtime_r fills the struct we own; `t` is a valid time_t.
+    unsafe {
+        let t = libc::time(std::ptr::null_mut());
+        let mut tm: libc::tm = std::mem::zeroed();
+        if libc::localtime_r(&t, &mut tm).is_null() { 0 } else { tm.tm_gmtoff }
+    }
+}
+
+/// Windows: not read yet; alarms then follow UTC.
+#[cfg(not(unix))]
+pub fn utc_offset_secs() -> i64 {
+    0
+}

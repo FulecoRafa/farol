@@ -65,6 +65,11 @@ pub trait Provider {
     fn generate(&self, _q: &Query) -> Vec<Item> {
         Vec::new()
     }
+    /// Rows shown with the field empty, above the recent ones (running
+    /// timers).
+    fn home(&self) -> Vec<Item> {
+        Vec::new()
+    }
     /// Shown for an empty scoped search (`:` alone); defaults to the catalog.
     fn browse(&self) -> Option<Vec<Item>> {
         None
@@ -151,6 +156,12 @@ impl Engine {
         } else {
             let text = text.trim();
             if text.is_empty() {
+                for p in &self.providers {
+                    let items = p.home();
+                    if !items.is_empty() {
+                        sections.push(Section { provider: p.id().into(), title: p.title().into(), items });
+                    }
+                }
                 sections.push(self.recent());
             } else {
                 sections.extend(self.alias_hits(text));

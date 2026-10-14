@@ -18,7 +18,7 @@ use crate::engine::{Engine, Providers};
 use crate::item::{Preview, Section};
 use crate::platform;
 use crate::providers::{
-    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, windows::Windows,
+    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, timers::Timers, windows::Windows,
 };
 
 #[derive(Clone, Default, Serialize)]
@@ -85,6 +85,8 @@ pub struct Core {
     pub clipboard: Rc<Clipboard>,
     /// Answer the current text again if the clipboard rows are on screen.
     pub clipboard_changed: Rc<dyn Fn()>,
+    /// Ends timers: a task to run beside the service.
+    pub timers: Rc<Timers>,
 }
 
 /// `inline`: no executor around (the `query` command), so background
@@ -93,11 +95,13 @@ pub fn build(inline: bool) -> Result<Core, String> {
     let db = Store::open().map_err(|e| format!("{}: {e}", crate::db::path().display()))?;
     let farol = Rc::new(Farol::new(db.clone()));
     let clipboard = Rc::new(Clipboard::new(db.clone()));
+    let timers = Rc::new(Timers::new(db.clone()));
     let apps = Rc::new(Apps::new(db.clone()));
     let (switcher, closer) = Windows::pair(apps.clone());
     let providers: Providers = vec![
         Rc::new(Calc::new()),
         farol.clone(),
+        timers.clone(),
         apps,
         Rc::new(switcher),
         Rc::new(closer),
@@ -202,7 +206,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
         }
     });
 
-    Ok(Core { service: svc, engine, clipboard, clipboard_changed })
+    Ok(Core { service: svc, engine, clipboard, clipboard_changed, timers })
 }
 
 pub fn serve() -> ExitCode {
@@ -218,7 +222,9 @@ pub fn serve() -> ExitCode {
     let (tx, rx) = async_channel::unbounded();
     platform::watch_clipboard(core.clipboard.primary(), tx);
     let (clipboard, changed) = (core.clipboard.clone(), core.clipboard_changed.clone());
+    let timers = core.timers.clone();
     let record = async move {
+        tessela_service::spawn(timers.run()).detach();
         while let Ok(clip) = rx.recv().await {
             clipboard.record(clip);
             changed();
