@@ -1,0 +1,72 @@
+{
+  "nodes": {
+    "adwaita-shell": {
+      "inputs": {
+        "nixpkgs": [
+          "adwaita-shell",
+          "tessela",
+          "nixpkgs"
+        ],
+        "tessela": [
+          "tessela"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791984467,
+        "narHash": "sha256-Eyidp/5G4WboNIkOOtCTjeNktBc9WWLz/RZbOHvFleU=",
+        "ref": "refs/heads/master",
+        "rev": "5075261c527e4587cde32d7ba09c244cab82690d",
+        "revCount": 42,
+        "type": "git",
+        "url": "file:///home/fuleco/Dev/adwaita-shell"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/fuleco/Dev/adwaita-shell"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1791487292,
+        "narHash": "sha256-6BIvCXtdLW4HQwsOGkgH444aB3vCbHypE9TA78ireh8=",
+        "rev": "8edc0c72e3a38faf5434e40d1f19431125fe4b30",
+        "type": "tarball",
+        "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1088030.8edc0c72e3a3/nixexprs.tar.zst"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "type": "indirect"
+      }
+    },
+    "root": {
+      "inputs": {
+        "adwaita-shell": "adwaita-shell",
+        "nixpkgs": [
+          "tessela",
+          "nixpkgs"
+        ],
+        "tessela": "tessela"
+      }
+    },
+    "tessela": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1791989417,
+        "narHash": "sha256-DSBTlte9OTJ1AjnBtXnu5uQUsE58Vr4Zkky0dmi8CEU=",
+        "ref": "refs/heads/master",
+        "rev": "d6093e4c8aa4e4563ab385ab7198d3d9c70c9959",
+        "revCount": 85,
+        "type": "git",
+        "url": "file:///home/fuleco/Dev/tessela"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/fuleco/Dev/tessela"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

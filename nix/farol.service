@@ -1,0 +1,12 @@
+[Unit]
+Description=farol launcher (tessela)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=@bindir@/farol start
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
