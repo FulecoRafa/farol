@@ -4,7 +4,7 @@
 //!                   plugins and the options, as the window shows them
 //! methods  status → diagnostics (versions, database, timings per provider)
 //!          alias_add {name, target} · alias_remove {name}
-//!          hotkey_add {keys, query} · hotkey_remove {keys}
+//!          hotkey_add {keys, target} · hotkey_remove {keys}
 //!          link_add {name, url} · link_remove {name}
 //!          option_set {key, value} (`autostart` starts farol at login)
 //!
@@ -155,7 +155,17 @@ impl Settings {
                 if !hotkeys::is_combo(&keys) {
                     return Err(format!("“{}” não é uma combinação de teclas", a.keys));
                 }
-                self.db.set_hotkey(&keys, a.query.trim()).map_err(err)?;
+                // The target as typed: nothing opens farol, a prefix opens
+                // it there, anything else names a row ("whatsapp").
+                let t = a.target.trim();
+                let query = if t.is_empty() {
+                    a.query.trim().to_string()
+                } else if t.starts_with(['=', ':', '/', '>', '!', '?', '@']) {
+                    t.to_string()
+                } else {
+                    format!("@{}", self.farol.resolve(t).ok_or("nada encontrado com esse destino")?.id)
+                };
+                self.db.set_hotkey(&keys, &query).map_err(err)?;
                 self.hotkeys.apply();
             }
             "hotkey_remove" => {
