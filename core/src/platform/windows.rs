@@ -87,3 +87,26 @@ fn collect(dir: &Path, out: &mut Vec<App>) {
         }
     }
 }
+
+/// Selects `path` in an Explorer window.
+pub fn reveal(path: &Path) -> std::io::Result<()> {
+    super::spawn(&["explorer".to_string(), format!("/select,{}", path.display())])
+}
+
+/// Files on the clipboard as files (a file drop list), through PowerShell.
+pub fn copy_files(paths: &[PathBuf]) -> std::io::Result<()> {
+    let list = paths
+        .iter()
+        .map(|p| format!("'{}'", p.display().to_string().replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(",");
+    super::spawn(&["powershell", "-NoProfile", "-Command", &format!("Set-Clipboard -Path {list}")])
+}
+
+pub fn default_terminal_here() -> Vec<String> {
+    ["wt", "-d", "{dir}"].map(String::from).to_vec()
+}
+
+pub fn default_editor() -> Vec<String> {
+    ["notepad", "{path}"].map(String::from).to_vec()
+}

@@ -5,3 +5,4 @@ pub mod apps;
 pub mod calc;
 pub mod emoji;
 pub mod farol;
+pub mod files;

@@ -21,6 +21,8 @@ nucleo-matcher = "0.3"
 # "=" and bare math: the same calculator as the old launcher (`fend`).
 fend-core = "1.5"
 emojis = "0.9"
+# Files: the walker behind ripgrep and fd (gitignore, hidden, parallel).
+ignore = "0.4"
 
 [profile.release]
 lto = true

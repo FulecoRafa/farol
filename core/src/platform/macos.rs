@@ -79,3 +79,26 @@ fn bundle(path: &Path) -> App {
         terminal: false,
     }
 }
+
+/// Selects `path` in a Finder window.
+pub fn reveal(path: &Path) -> std::io::Result<()> {
+    super::spawn(&[std::ffi::OsStr::new("open"), std::ffi::OsStr::new("-R"), path.as_os_str()])
+}
+
+/// Files on the pasteboard as files, through AppleScript's `POSIX file`.
+pub fn copy_files(paths: &[PathBuf]) -> std::io::Result<()> {
+    let list = paths
+        .iter()
+        .map(|p| format!("POSIX file \"{}\"", p.display().to_string().replace('"', "\\\"")))
+        .collect::<Vec<_>>()
+        .join(", ");
+    super::spawn(&["osascript", "-e", &format!("set the clipboard to {{{list}}}")])
+}
+
+pub fn default_terminal_here() -> Vec<String> {
+    ["open", "-a", "Terminal", "{dir}"].map(String::from).to_vec()
+}
+
+pub fn default_editor() -> Vec<String> {
+    ["open", "-t", "{path}"].map(String::from).to_vec()
+}

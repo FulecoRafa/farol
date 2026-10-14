@@ -103,3 +103,58 @@ pub fn launch(app: &App, terminal: &[String]) -> std::io::Result<()> {
         launch_app(app)
     }
 }
+
+/// `file:///home/me/My%20File.pdf`: the URI of a path, percent-encoded.
+pub fn file_uri(path: &std::path::Path) -> String {
+    let mut out = String::from("file://");
+    let text = path.to_string_lossy();
+    let text = if cfg!(windows) { format!("/{}", text.replace('\\', "/")) } else { text.into_owned() };
+    for b in text.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+/// A link to `path` under `<cache>/farol/<dir>`, named after the path: the
+/// renderer shows `file:` images only from a few places, the user's cache
+/// among them. Kept while it points at the same file.
+#[cfg(unix)]
+pub fn cache_link(path: &std::path::Path, dir: &str) -> Option<PathBuf> {
+    let ext = path.extension()?.to_str()?;
+    let dir = cache_dir().join("farol").join(dir);
+    let name: String = path
+        .to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c } else { '_' })
+        .collect();
+    let name = name.trim_start_matches('_');
+    let link = dir.join(if name.ends_with(ext) { name.to_string() } else { format!("{name}.{ext}") });
+    if std::fs::read_link(&link).ok().as_deref() != Some(path) {
+        std::fs::create_dir_all(&dir).ok()?;
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink(path, &link).ok()?;
+    }
+    Some(link)
+}
+
+#[cfg(not(unix))]
+pub fn cache_link(path: &std::path::Path, _dir: &str) -> Option<PathBuf> {
+    Some(path.to_path_buf())
+}
+
+/// An image file the launcher may draw (see [`cache_link`]).
+pub fn viewable(path: &std::path::Path) -> Option<PathBuf> {
+    cache_link(path, "view")
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn uris_are_encoded() {
+        let p = std::path::Path::new("/home/me/My File#1.pdf");
+        assert_eq!(super::file_uri(p), "file:///home/me/My%20File%231.pdf");
+    }
+}
