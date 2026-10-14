@@ -41,10 +41,35 @@ farol hotkey super+alt+space && farol hotkey super+v '>'   # shortcuts, bound wh
 | `alias zap = whatsapp` | aliases: `zap` brings WhatsApp first; Ctrl+A on any row |
 | plugins | any process serving a tessela service socket with `query`/`activate`, listed in the `plugins` setting |
 
-Settings live in the same SQLite file (`farol set KEY JSON`, `farol settings`):
+## Settings
+
+Ctrl+, in the launcher, `farol settings` or the "configurações do farol" row
+open the settings window: aliases and shortcuts (created by name, listed as
+what they open, next to the desktop's own shortcuts), links, plugins,
+starting at login, the programs farol uses and a diagnostics page.
+`farol autostart on` does the same from a terminal: a systemd user unit on
+the graphical session (XDG autostart without systemd), a LaunchAgent on
+macOS, a Startup script on Windows.
+
+Options live in the same SQLite file (`farol set KEY JSON`, `farol options`):
 `terminal`, `terminal.here`, `editor`, `browser`, `web.search`,
 `web.fallback`, `web.bookmarks`, `files.roots`, `files.hidden`,
 `files.mixed`, `clipboard.limit`, `clipboard.primary`, `prefixes`, `plugins`.
+
+## For developers
+
+```sh
+farol dev            # a second copy, farol-dev (own sockets and database), with
+                     # tessela's devtools served and their window opened
+farol dev --nested   # the same inside a headless sway: nothing on your screen
+farol doctor         # paths, what works on this desktop, timings per provider
+farol query TEXT     # one search answered in the terminal, with its time
+```
+
+The devtools show the live view tree, every call to the farol service,
+renders and frames; `tessela devtools --project farol-dev shot launcher`
+captures the window. Plugins: see `core/src/providers/external.rs` and
+`examples/hello-plugin.py`.
 
 ## Platforms
 
