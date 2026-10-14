@@ -102,11 +102,18 @@ pub fn dev(nested: bool) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    // The devtools window, once the runner serves it.
+    // The devtools window, once the runner serves it (not for --nested,
+    // which keeps everything off the screen).
+    if nested {
+        eprintln!("farol dev: devtools com tessela devtools --project farol-dev ui");
+    }
     let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
     let devtools = runtime.join("tessela/farol-dev/devtools.sock");
     std::thread::spawn(move || {
         for _ in 0..100 {
+            if nested {
+                return;
+            }
             if devtools.exists() {
                 let _ = Command::new(&tessela).args(["devtools", "--project", "farol-dev", "ui"]).spawn();
                 return;
