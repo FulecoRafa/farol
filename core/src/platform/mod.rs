@@ -12,6 +12,8 @@ pub mod hyprland;
 mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::*;
+#[cfg(target_os = "linux")]
+mod wayland;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -95,6 +97,13 @@ pub fn pipe<S: AsRef<OsStr>>(argv: &[S], input: &[u8]) -> std::io::Result<()> {
         let _ = child.wait();
     });
     Ok(())
+}
+
+/// A new clipboard selection, as the watcher read it: `text/plain` (UTF-8)
+/// or an image type with its bytes.
+pub struct Clip {
+    pub mime: String,
+    pub data: Vec<u8>,
 }
 
 /// Launch an app, in a terminal when it asks for one.

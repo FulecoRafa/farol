@@ -31,12 +31,33 @@ pub fn open(target: &str) -> std::io::Result<()> {
     super::spawn(&["xdg-open", target])
 }
 
+/// Text types a copied text is offered as.
+const TEXT_TYPES: &[&str] = &["text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING", "TEXT"];
+
 pub fn copy(text: &str) -> std::io::Result<()> {
-    if std::env::var_os("WAYLAND_DISPLAY").is_some() {
-        super::pipe(&["wl-copy"], text.as_bytes())
-    } else {
-        super::pipe(&["xclip", "-selection", "clipboard"], text.as_bytes())
+    copy_data("text/plain", text.as_bytes().to_vec())
+}
+
+/// Set the clipboard to `data` of type `mime`: natively when the watcher
+/// runs (farol serves the selection), else through `wl-copy` or `xclip`.
+pub fn copy_data(mime: &str, data: Vec<u8>) -> std::io::Result<()> {
+    let text = mime.starts_with("text/plain");
+    let types: &[&str] = if text { TEXT_TYPES } else { &[mime] };
+    if super::wayland::set(types, data.clone()) {
+        return Ok(());
     }
+    let mime = if text { "text/plain;charset=utf-8" } else { mime };
+    if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        super::pipe(&["wl-copy", "--type", mime], &data)
+    } else {
+        super::pipe(&["xclip", "-selection", "clipboard", "-t", mime], &data)
+    }
+}
+
+/// Watch the clipboard (see [`super::wayland`]); `primary` also records
+/// the primary selection. Every new selection arrives on `tx`.
+pub fn watch_clipboard(primary: bool, tx: async_channel::Sender<super::Clip>) {
+    super::wayland::watch(primary, tx);
 }
 
 pub(super) fn launch_app(app: &App) -> std::io::Result<()> {

@@ -23,6 +23,17 @@ fend-core = "1.5"
 emojis = "0.9"
 # Files: the walker behind ripgrep and fd (gitignore, hidden, parallel).
 ignore = "0.4"
+# The clipboard watcher hands selections to the service thread.
+async-channel = "2"
+# Image dimensions from their headers (PNG, JPEG, WebP...), no decoding.
+imagesize = "0.14"
+
+# The clipboard, natively: data-control on the display socket.
+[target.'cfg(target_os = "linux")'.dependencies]
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+libc = "0.2"
 
 [profile.release]
 lto = true

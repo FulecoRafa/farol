@@ -35,6 +35,19 @@ pub fn copy(text: &str) -> std::io::Result<()> {
     super::pipe(&["clip"], text.as_bytes())
 }
 
+/// Only text for now (`clip`); images need the Win32 clipboard API.
+pub fn copy_data(mime: &str, data: Vec<u8>) -> std::io::Result<()> {
+    if !mime.starts_with("text/") {
+        return Err(std::io::Error::other("só texto no Windows por enquanto"));
+    }
+    super::pipe(&["clip"], &data)
+}
+
+/// No history yet. The event-driven way is a message-only window with
+/// `AddClipboardFormatListener` (WM_CLIPBOARDUPDATE) on its own thread,
+/// sending to `tx` like the Wayland watcher; to be written with Win32.
+pub fn watch_clipboard(_primary: bool, _tx: async_channel::Sender<super::Clip>) {}
+
 pub(super) fn launch_app(app: &App) -> std::io::Result<()> {
     super::spawn(&app.exec)
 }

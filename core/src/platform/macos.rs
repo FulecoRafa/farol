@@ -27,6 +27,18 @@ pub fn copy(text: &str) -> std::io::Result<()> {
     super::pipe(&["pbcopy"], text.as_bytes())
 }
 
+/// Only text for now: images need NSPasteboard (objc), not `pbcopy`.
+pub fn copy_data(mime: &str, data: Vec<u8>) -> std::io::Result<()> {
+    if !mime.starts_with("text/") {
+        return Err(std::io::Error::other("só texto no macOS por enquanto"));
+    }
+    super::pipe(&["pbcopy"], &data)
+}
+
+/// No history yet: NSPasteboard has no change notification, only a
+/// `changeCount` to poll, and farol does not poll. Left off on purpose.
+pub fn watch_clipboard(_primary: bool, _tx: async_channel::Sender<super::Clip>) {}
+
 pub(super) fn launch_app(app: &App) -> std::io::Result<()> {
     super::spawn(&app.exec)
 }
