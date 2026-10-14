@@ -13,6 +13,8 @@ src/data/farol.ts   the farol service, typed
 core/               the core (Rust, tessela-service): search, providers, SQLite
 examples/           an external plugin in plain Python
 docs/PLANO.md       plan, principles and budget (Portuguese)
+flake.nix, nix/     Nix package, Home Manager and NixOS modules
+packaging/          RPM, Flatpak, Homebrew
 ```
 
 ## Running
@@ -23,6 +25,64 @@ cd ../tessela && ./target/release/tessela run ../farol      # or --nested to try
 farol toggle                                               # open/close (core/target/release/farol)
 farol hotkey super+alt+space && farol hotkey super+v '>'   # shortcuts, bound when farol starts
 ```
+
+## Installing
+
+Every package installs the same layout: `farol` (the CLI, and with no
+arguments the service) and the project in `share/farol` with adwaita-shell's
+`kit/` beside it, its `tessela.toml` pointing at both; `farol start` finds
+the project and the tessela runner from where it is installed. Then open it
+with `farol toggle` from a compositor keybinding, or let farol bind keys in
+Hyprland (`farol hotkey super+alt+space`). Details per format in
+[nix/README.md](nix/README.md) and `packaging/*/README.md`.
+
+**Nix** (flake; tessela and adwaita-shell are inputs):
+
+```sh
+nix run .                      # farol start
+nix build                      # result/bin/farol
+```
+
+```nix
+# Home Manager
+imports = [ inputs.farol.homeManagerModules.default ];
+services.farol = {
+  enable = true;                                # autostart: a user service on graphical-session.target
+  hotkeys = { "super+alt+space" = ""; "super+v" = ">"; };
+  settings = { terminal = [ "foot" ]; };        # farol set KEY JSON
+};
+# NixOS: imports = [ inputs.farol.nixosModules.default ]; programs.farol.enable = true;
+```
+
+**RPM** (Fedora; needs the `tessela` RPM from tessela's `packaging/rpm`):
+
+```sh
+nix develop ../tessela -c packaging/rpm/make-sources.sh ~/rpmbuild/SOURCES
+rpmbuild -ba packaging/rpm/farol.spec
+sudo dnf install ~/rpmbuild/RPMS/x86_64/{farol,tessela}-0.1.0-*.rpm
+systemctl --user enable --now farol.service          # or: farol start
+```
+
+**Flatpak** (runner, core, kit and icon font in one app; the sandbox is
+nominal, programs start on the host through `flatpak-spawn --host`):
+
+```sh
+flatpak-builder --user --install-deps-from=flathub --install --force-clean \
+    ~/build/farol packaging/flatpak/io.github.fuleco.Farol.yml
+flatpak run io.github.fuleco.Farol                   # farol start
+flatpak run io.github.fuleco.Farol toggle            # any other argument: the farol CLI
+```
+
+**Homebrew** (Linux only, a tap next to tessela's formula):
+
+```sh
+brew install <owner>/tessela/farol
+farol autostart on && farol start
+```
+
+When `core/Cargo.lock` changes, the RPM's vendored crates and `License:`
+and the Flatpak's `core-cargo-sources.json` must be regenerated (see their
+READMEs); the Nix package and the formula read the lock directly.
 
 ## What it finds
 
