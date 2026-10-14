@@ -59,7 +59,7 @@ fn main() -> ExitCode {
 
 /// Answer a search here, without a running service: rows and timing.
 fn query(text: &str) -> Result<String, String> {
-    let (_, engine) = service::build(true)?;
+    let engine = service::build(true)?.engine;
     engine.opened();
     let t = std::time::Instant::now();
     let sections = engine.query(text);

@@ -24,6 +24,7 @@ const PAGE = 8;
 const MODES: Record<string, [string, string]> = {
   "=": ["calculator", "calculadora"],
   ":": ["smiley", "emoji"],
+  ">": ["clipboard-text", "área de transferência"],
 };
 
 interface Row {

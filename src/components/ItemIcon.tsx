@@ -5,6 +5,7 @@ import type { Item } from "../data/farol";
 const FALLBACK: Record<string, string> = {
   apps: "app-window",
   calc: "calculator",
+  clipboard: "clipboard-text",
   emoji: "smiley",
   farol: "lighthouse",
 };

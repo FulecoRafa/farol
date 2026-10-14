@@ -69,6 +69,10 @@ pub struct Outcome {
     /// Shown under the field for a moment ("copiado", an error).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub toast: String,
+    /// Answer the current text again (the rows changed: deleted, pinned).
+    /// Handled by the service, never sent.
+    #[serde(default, skip)]
+    pub refresh: bool,
 }
 
 impl Outcome {
@@ -83,6 +87,9 @@ impl Outcome {
     }
     pub fn close_with(text: impl Into<String>) -> Self {
         Self { close: true, toast: text.into(), ..Self::default() }
+    }
+    pub fn refresh_with(text: impl Into<String>) -> Self {
+        Self { refresh: true, toast: text.into(), ..Self::default() }
     }
 }
 

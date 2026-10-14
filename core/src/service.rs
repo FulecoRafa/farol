@@ -16,7 +16,10 @@ use tessela_service::{Host, Service, Topic};
 use crate::db::Store;
 use crate::engine::{Engine, Providers};
 use crate::item::{Preview, Section};
-use crate::providers::{apps::Apps, calc::Calc, emoji::Emoji, farol::Farol, files::Files, windows::Windows};
+use crate::platform;
+use crate::providers::{
+    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, windows::Windows,
+};
 
 #[derive(Clone, Default, Serialize)]
 pub struct Ui {
@@ -75,11 +78,21 @@ fn set_open(ui: &Topic<Ui>, open: bool, query: String) {
     });
 }
 
-/// The service and its engine. `inline`: no executor around (the `query`
-/// command), so background searches run in place.
-pub fn build(inline: bool) -> Result<(Service, Rc<Engine>), String> {
+/// The service, its engine, and what the clipboard watcher feeds.
+pub struct Core {
+    pub service: Service,
+    pub engine: Rc<Engine>,
+    pub clipboard: Rc<Clipboard>,
+    /// Answer the current text again if the clipboard rows are on screen.
+    pub clipboard_changed: Rc<dyn Fn()>,
+}
+
+/// `inline`: no executor around (the `query` command), so background
+/// searches run in place.
+pub fn build(inline: bool) -> Result<Core, String> {
     let db = Store::open().map_err(|e| format!("{}: {e}", crate::db::path().display()))?;
     let farol = Rc::new(Farol::new(db.clone()));
+    let clipboard = Rc::new(Clipboard::new(db.clone()));
     let apps = Rc::new(Apps::new(db.clone()));
     let (switcher, closer) = Windows::pair(apps.clone());
     let providers: Providers = vec![
@@ -90,6 +103,7 @@ pub fn build(inline: bool) -> Result<(Service, Rc<Engine>), String> {
         Rc::new(closer),
         Rc::new(Files::new(db.clone(), inline)),
         Rc::new(Emoji::new(db.clone())),
+        clipboard.clone(),
     ];
     let engine = Rc::new(Engine::new(db, providers));
     farol.attach(&engine);
@@ -128,11 +142,13 @@ pub fn build(inline: bool) -> Result<(Service, Rc<Engine>), String> {
         Ok(())
     });
 
-    let (e, u) = (engine.clone(), ui.clone());
-    svc.method_sync("activate", move |a: Activate| {
-        let out = e.activate(&a.id, &a.action);
+    let (e, u, r, a) = (engine.clone(), ui.clone(), results.clone(), answer.clone());
+    svc.method_sync("activate", move |act: Activate| {
+        let out = e.activate(&act.id, &act.action);
         if out.close {
             set_open(&u, false, String::new());
+        } else if out.refresh {
+            a(r.get().text, false);
         }
         Ok(out)
     });
@@ -178,18 +194,37 @@ pub fn build(inline: bool) -> Result<(Service, Rc<Engine>), String> {
         Ok(())
     });
 
-    Ok((svc, engine))
+    let (u, r, a) = (ui.clone(), results.clone(), answer.clone());
+    let clipboard_changed: Rc<dyn Fn()> = Rc::new(move || {
+        let shown = r.get();
+        if u.get().open && shown.sections.iter().any(|s| s.provider == "clipboard") {
+            a(shown.text, false);
+        }
+    });
+
+    Ok(Core { service: svc, engine, clipboard, clipboard_changed })
 }
 
 pub fn serve() -> ExitCode {
-    let (svc, _engine) = match build(false) {
+    let core = match build(false) {
         Ok(x) => x,
         Err(e) => {
             eprintln!("farol: {e}");
             return ExitCode::FAILURE;
         }
     };
-    match Host::new().add(svc).run(async {}) {
+    // The clipboard watcher (a thread) hands selections over; they are
+    // stored here, on the thread that owns the database.
+    let (tx, rx) = async_channel::unbounded();
+    platform::watch_clipboard(core.clipboard.primary(), tx);
+    let (clipboard, changed) = (core.clipboard.clone(), core.clipboard_changed.clone());
+    let record = async move {
+        while let Ok(clip) = rx.recv().await {
+            clipboard.record(clip);
+            changed();
+        }
+    };
+    match Host::new().add(core.service).run(record) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("farol: {e}");
