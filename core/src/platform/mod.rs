@@ -48,13 +48,27 @@ pub fn home() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+/// A command for a program to run where the user's programs are: here,
+/// or on the host when farol runs inside a Flatpak (`FLATPAK_ID` set),
+/// through `flatpak-spawn --host` (the app has
+/// `--talk-name=org.freedesktop.Flatpak`). Apps, `xdg-open`, `notify-send`
+/// and `wl-copy` are the host's, not the runtime's.
+fn command<S: AsRef<OsStr>>(program: S) -> Command {
+    if std::env::var_os("FLATPAK_ID").is_none() {
+        return Command::new(program);
+    }
+    let mut cmd = Command::new("flatpak-spawn");
+    cmd.arg("--host").arg(format!("--directory={}", home().display())).arg(program);
+    cmd
+}
+
 /// Start a program detached from farol: its own session, no stdio, reaped
 /// by a thread so it never lingers as a zombie.
 pub fn spawn<S: AsRef<OsStr>>(argv: &[S]) -> std::io::Result<()> {
     let Some((program, args)) = argv.split_first() else {
         return Err(std::io::Error::other("empty command"));
     };
-    let mut cmd = Command::new(program);
+    let mut cmd = command(program);
     cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -74,7 +88,7 @@ pub fn pipe<S: AsRef<OsStr>>(argv: &[S], input: &[u8]) -> std::io::Result<()> {
     let Some((program, args)) = argv.split_first() else {
         return Ok(());
     };
-    let mut child = Command::new(program)
+    let mut child = command(program)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
