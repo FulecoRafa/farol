@@ -90,6 +90,17 @@ pub struct Engine {
     matcher: RefCell<Matcher>,
     /// Rows of the last answer, by id, for actions and previews.
     last: RefCell<HashMap<String, Item>>,
+    /// Per provider: (last, slowest, total) ms and how many answers, for
+    /// `farol doctor` and the diagnostics page.
+    timings: RefCell<HashMap<&'static str, Timing>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, serde::Serialize)]
+pub struct Timing {
+    pub last: f64,
+    pub max: f64,
+    pub total: f64,
+    pub count: u64,
 }
 
 /// Bonus for launches: count and recency, capped so a perfect match of a
@@ -107,7 +118,26 @@ impl Engine {
             providers,
             matcher: RefCell::new(Matcher::new(Config::DEFAULT)),
             last: RefCell::new(HashMap::new()),
+            timings: RefCell::default(),
         }
+    }
+
+    fn time(&self, id: &'static str, started: std::time::Instant) {
+        let ms = started.elapsed().as_secs_f64() * 1000.0;
+        let mut t = self.timings.borrow_mut();
+        let e = t.entry(id).or_default();
+        e.last = ms;
+        e.max = e.max.max(ms);
+        e.total += ms;
+        e.count += 1;
+    }
+
+    /// How long each provider took, in the mixed list (scoped searches go
+    /// under their provider too).
+    pub fn timings(&self) -> Vec<(&'static str, Timing)> {
+        let mut v: Vec<_> = self.timings.borrow().iter().map(|(k, v)| (*k, *v)).collect();
+        v.sort_by(|a, b| b.1.max.total_cmp(&a.1.max));
+        v
     }
 
     pub fn providers(&self) -> &Providers {
@@ -146,12 +176,14 @@ impl Engine {
         if let Some((prefix, p)) = self.prefixes().into_iter().find(|(k, _)| text.starts_with(k.as_str())) {
             let rest = text[prefix.len()..].trim();
             let q = Query { text: rest, scoped: true };
+            let started = std::time::Instant::now();
             let mut items = p.generate(&q);
             if rest.is_empty() {
                 items.extend(p.browse().or_else(|| p.items().map(|i| i.iter().take(60).cloned().collect())).unwrap_or_default());
             } else if let Some(catalog) = p.items() {
                 items.extend(self.rank(&catalog, rest, 80));
             }
+            self.time(p.id(), started);
             sections.push(Section { provider: p.id().into(), title: p.title().into(), items });
         } else {
             let text = text.trim();
@@ -167,12 +199,14 @@ impl Engine {
                 sections.extend(self.alias_hits(text));
                 let q = Query { text, scoped: false };
                 for p in &self.providers {
+                    let started = std::time::Instant::now();
                     let mut items = p.generate(&q);
                     if p.mixed() > 0 {
                         if let Some(catalog) = p.items() {
                             items.extend(self.rank(&catalog, text, p.mixed()));
                         }
                     }
+                    self.time(p.id(), started);
                     if !items.is_empty() {
                         sections.push(Section { provider: p.id().into(), title: p.title().into(), items });
                     }
