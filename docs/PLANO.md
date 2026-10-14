@@ -26,16 +26,17 @@ aninhado (`tessela run ../farol --nested --devtools`).
 1. **Base** ✔ — núcleo, SQLite, motor, apps, calculadora (fend), emoji,
    pseudônimos e links pelo campo, superfície com teclado, preview, ações.
    Framework: `Input.onKey`, colar, apagar palavra; `Surface keyboard`.
-2. **Providers** — arquivos (busca na home, recentes, preview de texto e
+2. **Providers** ✔ — arquivos (busca na home, recentes, preview de texto e
    imagem com miniaturas), clipboard (Wayland data-control, por evento),
    janelas (Hyprland: focar, fechar, matar, mover), timers e alarmes (com
-   notificação), comandos do sistema, web (links rápidos `gh {query}`,
-   favoritos do Helium), abas do Helium.
-3. **Atalhos** — `farol toggle [texto]` para o compositor; no Hyprland, o
+   notificação), web (links rápidos `gh {query}`, favoritos do Helium,
+   busca), plugins externos. Falta: abas do Helium (pede uma extensão no
+   navegador para trocar de aba), comandos do sistema (bloquear, suspender).
+3. **Atalhos** ✔ — `farol toggle [texto]` para o compositor; no Hyprland, o
    núcleo registra os atalhos do banco por `hyprctl keyword bind` (de novo
-   a cada `configreloaded`) e lê `hyprctl binds -j` para mostrar os já
-   configurados e avisar conflitos. Atalhos por ação (`!run <id>`).
-4. **Arrastar para fora** — framework: um `Box` arrastável que oferece
+   a cada `configreloaded`) e lê `binds` para mostrar os já configurados
+   e avisar conflitos. Atalhos por linha (`atalho @id`, `farol run`).
+4. **Arrastar para fora** ✔ — framework: um `Box` arrastável que oferece
    `text/uri-list` ao compositor (GPUI não faz drag para fora no Wayland).
 5. **macOS e Windows** — tessela: janela comum flutuante em vez de
    layer-shell, sockets por plataforma; farol: atalhos globais nativos,
