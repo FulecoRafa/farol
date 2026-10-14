@@ -18,7 +18,8 @@ use crate::engine::{Engine, Providers};
 use crate::item::{Preview, Section};
 use crate::platform;
 use crate::providers::{
-    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, timers::Timers, windows::Windows,
+    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, timers::Timers,
+    web::{Web, WebSearch}, windows::Windows,
 };
 
 #[derive(Clone, Default, Serialize)]
@@ -96,6 +97,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
     let farol = Rc::new(Farol::new(db.clone()));
     let clipboard = Rc::new(Clipboard::new(db.clone()));
     let timers = Rc::new(Timers::new(db.clone()));
+    let web = Rc::new(Web::new(db.clone()));
     let apps = Rc::new(Apps::new(db.clone()));
     let (switcher, closer) = Windows::pair(apps.clone());
     let providers: Providers = vec![
@@ -105,9 +107,11 @@ pub fn build(inline: bool) -> Result<Core, String> {
         apps,
         Rc::new(switcher),
         Rc::new(closer),
+        web.clone(),
         Rc::new(Files::new(db.clone(), inline)),
         Rc::new(Emoji::new(db.clone())),
         clipboard.clone(),
+        Rc::new(WebSearch(web)),
     ];
     let engine = Rc::new(Engine::new(db, providers));
     farol.attach(&engine);

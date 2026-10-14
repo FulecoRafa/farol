@@ -8,4 +8,5 @@ pub mod emoji;
 pub mod farol;
 pub mod files;
 pub mod timers;
+pub mod web;
 pub mod windows;
