@@ -1,0 +1,30 @@
+[package]
+name = "farol"
+description = "farol's core: search, plugins and settings for the launcher, one resident process"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Its own workspace: built from this directory, next to the TSX project.
+[workspace]
+
+[dependencies]
+tessela-service = { path = "../../tessela/sdk/rust", features = ["process"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures-lite = "2"
+# Settings, aliases, usage, clipboard and timers: one file.
+rusqlite = { version = "0.40", features = ["bundled"] }
+# The same matcher as helix: fast, unicode-aware fuzzy scores.
+nucleo-matcher = "0.3"
+# "=" and bare math: the same calculator as the old launcher (`fend`).
+fend-core = "1.5"
+emojis = "0.9"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+opt-level = 3
