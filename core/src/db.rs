@@ -27,7 +27,35 @@ const SCHEMA: &[&str] = &[
         id INTEGER PRIMARY KEY, hash INTEGER NOT NULL UNIQUE, mime TEXT NOT NULL,
         text TEXT NOT NULL, data BLOB, at INTEGER NOT NULL, pinned INTEGER NOT NULL DEFAULT 0);
      CREATE INDEX clipboard_at ON clipboard(at);",
+    // 2: image dimensions, read once when recorded (rows never load blobs).
+    "ALTER TABLE clipboard ADD COLUMN width INTEGER NOT NULL DEFAULT 0;
+     ALTER TABLE clipboard ADD COLUMN height INTEGER NOT NULL DEFAULT 0;",
 ];
+
+/// A clipboard entry as listed: no blob, the text cut to its start.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Clip {
+    pub id: i64,
+    pub hash: i64,
+    pub mime: String,
+    /// The first [`CLIP_HEAD`] characters (empty for images).
+    pub text: String,
+    /// Bytes of the whole entry.
+    pub size: i64,
+    pub width: i64,
+    pub height: i64,
+    pub at: i64,
+    pub pinned: bool,
+}
+
+/// Characters of text a listed [`Clip`] carries.
+pub const CLIP_HEAD: usize = 400;
+
+/// What a recorded selection was: text, or an image's bytes.
+pub enum ClipData<'a> {
+    Text(&'a str),
+    Image { mime: &'a str, data: &'a [u8], width: i64, height: i64 },
+}
 
 pub fn path() -> PathBuf {
     if let Some(p) = std::env::var_os("FAROL_DB") {
@@ -190,6 +218,111 @@ impl Store {
         self.rows("SELECT keys, query FROM hotkeys ORDER BY keys", [], |r| Ok((r.get(0)?, r.get(1)?)))
     }
 
+    // ── clipboard ───────────────────────────────────────────────────────
+
+    /// Record a selection at `at`: a copy already kept moves to the top
+    /// (same hash), then the oldest unpinned go until at most `limit` are
+    /// left (pinned ones always stay). Returns the hashes evicted.
+    pub fn clip_record(&self, hash: i64, clip: ClipData, at: i64, limit: usize) -> rusqlite::Result<Vec<i64>> {
+        let (mime, text, data, w, h) = match clip {
+            ClipData::Text(t) => ("text/plain", t, None, 0, 0),
+            ClipData::Image { mime, data, width, height } => (mime, "", Some(data), width, height),
+        };
+        self.conn.execute(
+            "INSERT INTO clipboard (hash, mime, text, data, at, width, height) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(hash) DO UPDATE SET at = excluded.at",
+            params![hash, mime, text, data, at, w, h],
+        )?;
+        self.clip_trim(limit)
+    }
+
+    /// Drop the oldest unpinned entries beyond `limit` (counting pinned).
+    pub fn clip_trim(&self, limit: usize) -> rusqlite::Result<Vec<i64>> {
+        let mut stmt = self.conn.prepare_cached(
+            "DELETE FROM clipboard WHERE pinned = 0 AND id NOT IN (
+                SELECT id FROM clipboard WHERE pinned = 0 ORDER BY at DESC, id DESC
+                LIMIT max(?1 - (SELECT count(*) FROM clipboard WHERE pinned = 1), 0))
+             RETURNING hash",
+        )?;
+        let rows = stmt.query_map([limit as i64], |r| r.get(0))?;
+        rows.collect()
+    }
+
+    /// Entries without their blobs: pinned first, then newest first.
+    pub fn clips(&self, limit: usize) -> Vec<Clip> {
+        self.rows(
+            "SELECT id, hash, mime, substr(text, 1, ?1), length(CAST(coalesce(data, text) AS BLOB)),
+                    width, height, at, pinned
+             FROM clipboard ORDER BY pinned DESC, at DESC, id DESC LIMIT ?2",
+            params![CLIP_HEAD as i64, limit as i64],
+            |r| {
+                Ok(Clip {
+                    id: r.get(0)?,
+                    hash: r.get(1)?,
+                    mime: r.get(2)?,
+                    text: r.get(3)?,
+                    size: r.get(4)?,
+                    width: r.get(5)?,
+                    height: r.get(6)?,
+                    at: r.get(7)?,
+                    pinned: r.get(8)?,
+                })
+            },
+        )
+    }
+
+    /// One entry whole: its listing, the full text and the blob.
+    pub fn clip(&self, id: i64) -> Option<(Clip, String, Option<Vec<u8>>)> {
+        self.conn
+            .query_row(
+                "SELECT id, hash, mime, text, length(CAST(coalesce(data, text) AS BLOB)),
+                        width, height, at, pinned, data
+                 FROM clipboard WHERE id = ?1",
+                [id],
+                |r| {
+                    let text: String = r.get(3)?;
+                    let clip = Clip {
+                        id: r.get(0)?,
+                        hash: r.get(1)?,
+                        mime: r.get(2)?,
+                        text: text.chars().take(CLIP_HEAD).collect(),
+                        size: r.get(4)?,
+                        width: r.get(5)?,
+                        height: r.get(6)?,
+                        at: r.get(7)?,
+                        pinned: r.get(8)?,
+                    };
+                    Ok((clip, text, r.get(9)?))
+                },
+            )
+            .optional()
+            .ok()
+            .flatten()
+    }
+
+    /// Forget an entry; its hash, if it existed.
+    pub fn clip_delete(&self, id: i64) -> Option<i64> {
+        self.conn
+            .query_row("DELETE FROM clipboard WHERE id = ?1 RETURNING hash", [id], |r| r.get(0))
+            .optional()
+            .ok()
+            .flatten()
+    }
+
+    /// Flip an entry's pin; the new state.
+    pub fn clip_pin(&self, id: i64) -> Option<bool> {
+        self.conn
+            .query_row("UPDATE clipboard SET pinned = 1 - pinned WHERE id = ?1 RETURNING pinned", [id], |r| r.get(0))
+            .optional()
+            .ok()
+            .flatten()
+    }
+
+    /// Move an entry to the top (it was copied again).
+    pub fn clip_touch(&self, id: i64, at: i64) {
+        let _ = self.conn.execute("UPDATE clipboard SET at = ?2 WHERE id = ?1", params![id, at]);
+    }
+
     pub fn rows<T, P: rusqlite::Params>(
         &self,
         sql: &str,
@@ -258,6 +391,59 @@ mod tests {
         let u = db.usage();
         assert_eq!(u.len(), 1);
         assert_eq!(u[0].1, 2);
+    }
+
+    fn texts(db: &Store) -> Vec<String> {
+        db.clips(100).into_iter().map(|c| c.text).collect()
+    }
+
+    #[test]
+    fn clipboard_dedupes_to_the_top() {
+        let db = Store::memory();
+        db.clip_record(1, ClipData::Text("a"), 10, 10).unwrap();
+        db.clip_record(2, ClipData::Text("b"), 20, 10).unwrap();
+        assert_eq!(texts(&db), ["b", "a"]);
+        // Copied again: one row, now the newest, same id.
+        let id = db.clips(10)[1].id;
+        db.clip_record(1, ClipData::Text("a"), 30, 10).unwrap();
+        assert_eq!(texts(&db), ["a", "b"]);
+        assert_eq!(db.clips(10)[0].id, id);
+    }
+
+    #[test]
+    fn clipboard_limit_spares_pinned() {
+        let db = Store::memory();
+        for i in 0..5 {
+            db.clip_record(i, ClipData::Text(&i.to_string()), i * 10, 10).unwrap();
+        }
+        let oldest = db.clips(10).last().unwrap().id;
+        assert_eq!(db.clip_pin(oldest), Some(true));
+        // Limit 3 with one pinned: the pinned "0" plus the two newest.
+        let evicted = db.clip_record(5, ClipData::Text("5"), 60, 3).unwrap();
+        assert_eq!(texts(&db), ["0", "5", "4"]);
+        assert_eq!(evicted.len(), 3);
+        // Pinned survive even a limit below their count.
+        db.clip_trim(0).unwrap();
+        assert_eq!(texts(&db), ["0"]);
+        assert_eq!(db.clip_pin(oldest), Some(false));
+        db.clip_trim(0).unwrap();
+        assert!(texts(&db).is_empty());
+    }
+
+    #[test]
+    fn clipboard_images_and_delete() {
+        let db = Store::memory();
+        let png = [1u8, 2, 3];
+        db.clip_record(7, ClipData::Image { mime: "image/png", data: &png, width: 4, height: 2 }, 1, 10).unwrap();
+        let c = &db.clips(10)[0];
+        assert_eq!((c.mime.as_str(), c.size, c.width, c.height), ("image/png", 3, 4, 2));
+        let (_, _, data) = db.clip(c.id).unwrap();
+        assert_eq!(data.as_deref(), Some(&png[..]));
+        assert_eq!(db.clip_delete(c.id), Some(7));
+        assert_eq!(db.clip_delete(c.id), None);
+        // Text size is bytes, not characters.
+        db.clip_record(8, ClipData::Text("ção"), 2, 10).unwrap();
+        assert_eq!(db.clips(10)[0].size, 5);
     }
 
     #[test]
