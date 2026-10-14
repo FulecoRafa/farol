@@ -40,7 +40,7 @@ impl Farol {
     }
 
     /// The row a target stands for: an `@id`, else the best search hit.
-    fn resolve(&self, target: &str) -> Option<Item> {
+    pub fn resolve(&self, target: &str) -> Option<Item> {
         let engine = self.engine()?;
         if let Some(id) = target.strip_prefix('@') {
             return engine.item(id);
@@ -126,9 +126,10 @@ impl Provider for Farol {
     fn title(&self) -> &'static str {
         "farol"
     }
-    /// The saved aliases and links show only when asked for by name.
+    /// Only the settings row joins the mixed list; the saved aliases and
+    /// links show when asked for by name.
     fn mixed(&self) -> usize {
-        0
+        1
     }
     fn tracks_usage(&self) -> bool {
         false
@@ -138,7 +139,7 @@ impl Provider for Farol {
             *self.pending.borrow_mut() = Some(p);
             return vec![item];
         }
-        let wants = |kind: &str| self.items().map(|i| i.iter().filter(|i| i.subtitle == kind).cloned().collect()).unwrap_or_default();
+        let wants = |kind: &str| self.saved().into_iter().filter(|i| i.subtitle == kind).collect();
         match q.text.trim() {
             "alias" | "aliases" | "apelidos" | "pseudônimos" | "pseudonimos" => wants("pseudônimo"),
             "link" | "links" => wants("link rápido"),
@@ -146,6 +147,27 @@ impl Provider for Farol {
         }
     }
     fn items(&self) -> Option<Rc<Vec<Item>>> {
+        Some(Rc::new(vec![Item {
+            id: "farol:settings".into(),
+            title: "configurações do farol".into(),
+            subtitle: "pseudônimos, atalhos, links, plugins, iniciar no login".into(),
+            icon: "ph:gear-six".into(),
+            keywords: "settings preferências preferencias ajustes opções opcoes pseudônimos atalhos login diagnóstico".into(),
+            actions: vec![Action::new("open", "abrir", "enter")],
+            ..Item::default()
+        }]))
+    }
+    fn activate(&self, id: &str, action: &str) -> Outcome {
+        if id == "farol:settings" {
+            return Outcome { view: Some("settings".into()), ..Outcome::default() };
+        }
+        self.act(id, action)
+    }
+}
+
+impl Farol {
+    /// The saved aliases and links, as rows.
+    fn saved(&self) -> Vec<Item> {
         let remove = |what: &str| vec![Action::new("edit", "editar", "enter"), Action::new("remove", what, "ctrl+d")];
         let mut items: Vec<Item> = self
             .db
@@ -170,9 +192,10 @@ impl Provider for Farol {
             actions: remove("apagar link"),
             ..Item::default()
         }));
-        Some(Rc::new(items))
+        items
     }
-    fn activate(&self, id: &str, action: &str) -> Outcome {
+
+    fn act(&self, id: &str, action: &str) -> Outcome {
         if let Some(name) = id.strip_prefix("farol:alias:") {
             return if action == "remove" {
                 let _ = self.db.remove_alias(name);

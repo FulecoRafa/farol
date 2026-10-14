@@ -1,10 +1,11 @@
 //! The `farol` service: what the launcher surface subscribes to and calls.
 //!
-//! topics   ui       {open, query, nonce}   open/close requests (hotkeys, CLI)
+//! topics   ui       {open, query, nonce, view}   open/close requests (hotkeys, CLI)
 //!          results  {seq, text, sections}  the answer to the last `query`
 //!          preview  {id, ...}              the selected row's preview
 //! methods  query {text} · activate {id, action} · preview {id}
-//!          toggle {query} · show {query} · hide · run {id, action}
+//!          toggle {query} · show {query} · hide · run {id, action} · settings
+//! and what the settings window uses (see [`crate::settings`]).
 
 use std::process::ExitCode;
 use std::rc::Rc;
@@ -29,6 +30,8 @@ pub struct Ui {
     pub query: String,
     /// Bumped on every request, so reopening with the same text still lands.
     pub nonce: u64,
+    /// Which window: `launcher` (empty) or `settings`.
+    pub view: String,
 }
 
 #[derive(Clone, Default, Serialize)]
@@ -72,9 +75,14 @@ struct Id {
 }
 
 fn set_open(ui: &Topic<Ui>, open: bool, query: String) {
+    set_view(ui, open, query, "");
+}
+
+fn set_view(ui: &Topic<Ui>, open: bool, query: String, view: &str) {
     ui.update(|u| {
         u.open = open;
         u.query = query;
+        u.view = view.into();
         u.nonce += 1;
     });
 }
@@ -125,7 +133,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
             providers.insert(at + i, Rc::new(p));
         }
     }
-    let engine = Rc::new(Engine::new(db, providers));
+    let engine = Rc::new(Engine::new(db.clone(), providers));
     farol.attach(&engine);
     hotkeys.attach(&engine);
 
@@ -133,6 +141,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
     let ui = svc.topic("ui", Ui::default());
     let results = svc.topic("results", Results::default());
     let preview = svc.topic("preview", Shown::default());
+    let settings = crate::settings::register(&mut svc, db, engine.clone(), farol.clone(), hotkeys.clone());
 
     // Answer a text: results, and the first row's preview (the selection
     // starts there).
@@ -163,10 +172,13 @@ pub fn build(inline: bool) -> Result<Core, String> {
         Ok(())
     });
 
-    let (e, u, r, a) = (engine.clone(), ui.clone(), results.clone(), answer.clone());
+    let (e, u, r, a, s) = (engine.clone(), ui.clone(), results.clone(), answer.clone(), settings.clone());
     svc.method_sync("activate", move |act: Activate| {
         let out = e.activate(&act.id, &act.action);
-        if out.close {
+        if let Some(view) = &out.view {
+            s.publish();
+            set_view(&u, true, String::new(), view);
+        } else if out.close {
             set_open(&u, false, String::new());
         } else if out.refresh {
             a(r.get().text, false);
@@ -212,6 +224,14 @@ pub fn build(inline: bool) -> Result<Core, String> {
     // A shortcut bound to a row: run it without opening the launcher.
     let e = engine.clone();
     svc.method_sync("run", move |a: Activate| Ok(e.activate(&a.id, &a.action)));
+
+    // The settings window, fresh: config is read when it opens.
+    let (u, s) = (ui.clone(), settings.clone());
+    svc.method_sync("settings", move |_: Value| {
+        s.publish();
+        set_view(&u, true, String::new(), "settings");
+        Ok(())
+    });
 
     let u = ui.clone();
     svc.method_sync("hide", move |_: Value| {

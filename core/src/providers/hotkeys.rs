@@ -161,7 +161,7 @@ impl Hotkeys {
         *self.desktop.borrow_mut() = platform::desktop_binds();
     }
 
-    fn remove(&self, keys: &str) -> std::io::Result<()> {
+    pub fn remove(&self, keys: &str) -> std::io::Result<()> {
         let mut replaced = self.replaced();
         let restore = replaced.remove(keys);
         let _ = self.db.remove_hotkey(keys);

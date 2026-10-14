@@ -73,6 +73,10 @@ pub struct Outcome {
     /// Handled by the service, never sent.
     #[serde(default, skip)]
     pub refresh: bool,
+    /// Switch the window to another view (`settings`). Handled by the
+    /// service, never sent.
+    #[serde(default, skip)]
+    pub view: Option<String>,
 }
 
 impl Outcome {
