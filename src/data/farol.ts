@@ -51,6 +51,8 @@ const farol = () => use("farol");
 
 /** Whether the launcher is open (hotkeys and the CLI flip it). */
 export const open = () => farol().subscribe<{ open: boolean; nonce: number }>("ui")()?.open ?? false;
+/** The launcher shows when open and no other view is asked for. */
+export const launcherOpen = () => open() && view() === "";
 
 const EMPTY: Results = { seq: 0, text: "", sections: [] };
 export const results = () => farol().subscribe<Results>("results")() ?? EMPTY;
@@ -66,4 +68,34 @@ export function activate(id: string, action: string, done?: (o: Outcome) => void
     if (r.ok) done?.(r.value);
     else done?.({ toast: r.error });
   });
+}
+
+/** Which window the service asks for: "" (the launcher) or "settings". */
+export const view = () => farol().subscribe<{ view: string }>("ui")()?.view ?? "";
+export const openSettings = () => farol().call("settings");
+
+// ── the settings window ────────────────────────────────────────────────
+
+export interface Alias { name: string; target: string; title: string; subtitle: string; icon: string }
+export interface Hotkey { keys: string; query: string; title: string; subtitle: string; icon: string; replaced: string }
+export interface Config {
+  aliases: Alias[];
+  hotkeys: Hotkey[];
+  desktop: { keys: string; title: string }[];
+  links: { name: string; url: string }[];
+  plugins: { name: string; title?: string; prefix?: string; mixed?: number; online: boolean }[];
+  options: Record<string, unknown>;
+  autostart: boolean;
+}
+
+const NO_CONFIG: Config = { aliases: [], hotkeys: [], desktop: [], links: [], plugins: [], options: {}, autostart: false };
+export const config = () => farol().subscribe<Config>("config")() ?? NO_CONFIG;
+
+/** An edit (`alias_add`, `option_set`...); `done` gets the error, if any. */
+export function edit(method: string, args: Record<string, unknown>, done?: (error: string) => void) {
+  farol().call(method, args, (r) => done?.(r.ok ? "" : r.error));
+}
+
+export function status(done: (s: Record<string, any>) => void) {
+  farol().call<Record<string, any>>("status", null, (r) => r.ok && done(r.value));
 }

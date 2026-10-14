@@ -13,6 +13,11 @@ kit = "../adwaita-shell/kit"
 entry = "src/surfaces/launcher.tsx"
 capabilities = ["context", "timer", "service:farol"]
 
+# Aliases, shortcuts, links, plugins, options and diagnostics.
+[surfaces.settings]
+entry = "src/surfaces/settings.tsx"
+capabilities = ["context", "timer", "service:farol"]
+
 # The core: one resident process, one socket. Build it first:
 #   cargo build --release --manifest-path core/Cargo.toml
 [plugins.core]

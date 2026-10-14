@@ -5,7 +5,8 @@
 //
 // Keys: ↑↓ (Ctrl+P/N, Ctrl+K/J) move, Tab jumps to the next group, Page
 // Up/Down by a page, Enter runs the first action, the chords in the footer
-// run the others, Escape clears the field and then closes.
+// run the others, Escape clears the field and then closes. Ctrl+, opens the
+// settings.
 
 import { Icon } from "@kit/components/Icon";
 import * as farol from "../data/farol";
@@ -97,6 +98,7 @@ export default function Launcher() {
   const onKey = (e: { key: string; value: string }) => {
     const k = e.key;
     if (k === "escape") return e.value ? farol.search("") : farol.hide();
+    if (k === "ctrl+,") return farol.openSettings();
     if (k === "down" || k === "ctrl+n" || k === "ctrl+j") return select(view().index + 1);
     if (k === "up" || k === "ctrl+p" || k === "ctrl+k") return select(view().index - 1);
     if (k === "pagedown") return select(view().index + PAGE);
@@ -204,7 +206,7 @@ export default function Launcher() {
       height={HEIGHT}
       margin={[120, 0, 0, 0]}
       keyboard="exclusive"
-      visible={farol.open}
+      visible={farol.launcherOpen}
       onDismiss={farol.hide}
     >
       <Box grow direction="column" radius={24} bg="$surface" border="$surfaceBorder">
