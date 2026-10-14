@@ -188,7 +188,7 @@ pub(crate) fn parse_entry(id: &str, text: &str, locale: &[String], desktops: &[S
     let icon = if icon.is_empty() {
         String::new()
     } else if icon.starts_with('/') {
-        format!("file:{icon}")
+        linked_icon(Path::new(icon)).map(|p| format!("file:{}", p.display())).unwrap_or_default()
     } else {
         format!("icon:{icon}")
     };
@@ -203,6 +203,27 @@ pub(crate) fn parse_entry(id: &str, text: &str, locale: &[String], desktops: &[S
         exec,
         terminal: yes("Terminal"),
     })
+}
+
+/// An icon given by absolute path (often deep in /nix/store or /opt),
+/// linked into `~/.cache/farol/icons`: renderers show `file:` images only
+/// from a few places, and the user's cache is one of them.
+fn linked_icon(path: &Path) -> Option<PathBuf> {
+    let ext = path.extension()?.to_str()?;
+    let dir = cache_dir().join("farol").join("icons");
+    let name: String = path
+        .to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c } else { '_' })
+        .collect();
+    let name = name.trim_start_matches('_');
+    let link = dir.join(if name.ends_with(ext) { name.to_string() } else { format!("{name}.{ext}") });
+    if std::fs::read_link(&link).ok().as_deref() != Some(path) {
+        std::fs::create_dir_all(&dir).ok()?;
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink(path, &link).ok()?;
+    }
+    Some(link)
 }
 
 /// Value escapes of the spec: `\s \n \t \r \\`.

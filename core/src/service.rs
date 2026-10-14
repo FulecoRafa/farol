@@ -1,7 +1,7 @@
 //! The `farol` service: what the launcher surface subscribes to and calls.
 //!
 //! topics   ui       {open, query, nonce}   open/close requests (hotkeys, CLI)
-//!          results  {text, sections}       the answer to the last `query`
+//!          results  {seq, text, sections}  the answer to the last `query`
 //!          preview  {id, ...}              the selected row's preview
 //! methods  query {text} · activate {id, action} · preview {id}
 //!          toggle {query} · show {query} · hide
@@ -29,6 +29,9 @@ pub struct Ui {
 
 #[derive(Clone, Default, Serialize)]
 struct Results {
+    /// Bumped per answer: the launcher resets its selection on a new one.
+    seq: u64,
+    /// The text answered; the field shows it (the service owns the text).
     text: String,
     sections: Vec<Section>,
 }
@@ -89,10 +92,25 @@ pub fn build() -> Result<(Service, Rc<Engine>), String> {
     let results = svc.topic("results", Results::default());
     let preview = svc.topic("preview", Shown::default());
 
-    let (e, r) = (engine.clone(), results.clone());
-    svc.method_sync("query", move |a: Text| {
-        let sections = e.query(&a.text);
-        r.publish(Results { text: a.text, sections });
+    // Answer a text: results, and the first row's preview (the selection
+    // starts there).
+    let answer = {
+        let (e, r, p) = (engine.clone(), results.clone(), preview.clone());
+        Rc::new(move |text: String| {
+            let sections = e.query(&text);
+            let first = sections.first().and_then(|s| s.items.first()).map(|i| i.id.clone());
+            let seq = r.get().seq + 1;
+            r.publish(Results { seq, text, sections });
+            p.publish(match first {
+                Some(id) => Shown { preview: e.preview(&id), id },
+                None => Shown::default(),
+            });
+        })
+    };
+
+    let a = answer.clone();
+    svc.method_sync("query", move |t: Text| {
+        a(t.text);
         Ok(())
     });
 
@@ -111,23 +129,32 @@ pub fn build() -> Result<(Service, Rc<Engine>), String> {
         Ok(())
     });
 
-    let (e, u) = (engine.clone(), ui.clone());
+    let show = {
+        let (e, u, a) = (engine.clone(), ui.clone(), answer.clone());
+        Rc::new(move |query: String| {
+            e.opened();
+            a(query.clone());
+            set_open(&u, true, query);
+        })
+    };
+
+    let (u, s) = (ui.clone(), show.clone());
     svc.method_sync("toggle", move |a: Option<Open>| {
         let a = a.unwrap_or_default();
         let current = u.get();
         // Toggling with another text while open switches to that text.
         let open = !current.open || (!a.query.is_empty() && a.query != current.query);
         if open {
-            e.opened();
+            s(a.query);
+        } else {
+            set_open(&u, false, String::new());
         }
-        set_open(&u, open, a.query);
         Ok(json!({ "open": open }))
     });
 
-    let (e, u) = (engine.clone(), ui.clone());
+    let s = show.clone();
     svc.method_sync("show", move |a: Option<Open>| {
-        e.opened();
-        set_open(&u, true, a.unwrap_or_default().query);
+        s(a.unwrap_or_default().query);
         Ok(())
     });
 

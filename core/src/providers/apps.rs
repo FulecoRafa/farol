@@ -109,7 +109,7 @@ impl Provider for Apps {
         let Some(app) = self.app(id) else { return Preview::None };
         Preview::Text {
             title: app.name.clone(),
-            text: app.comment.clone(),
+            text: String::new(),
             facts: vec![
                 ("comando".into(), app.exec.join(" ")),
                 ("id".into(), app.id.clone()),

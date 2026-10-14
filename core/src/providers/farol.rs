@@ -53,6 +53,14 @@ impl Farol {
             .next()
     }
 
+    /// What an alias target shows as: the row's title when it is an id.
+    fn target_name(&self, target: &str) -> String {
+        self.engine()
+            .and_then(|e| e.item(target))
+            .map(|i| i.title)
+            .unwrap_or_else(|| target.to_string())
+    }
+
     fn parse(&self, text: &str) -> Option<(Pending, Item)> {
         let (word, rest) = text.split_once(char::is_whitespace).unwrap_or((text, ""));
         let rest = rest.trim();
@@ -118,19 +126,23 @@ impl Provider for Farol {
     fn title(&self) -> &'static str {
         "farol"
     }
+    /// The saved aliases and links show only when asked for by name.
     fn mixed(&self) -> usize {
-        2
+        0
     }
     fn tracks_usage(&self) -> bool {
         false
     }
     fn generate(&self, q: &Query) -> Vec<Item> {
-        match self.parse(q.text) {
-            Some((p, item)) => {
-                *self.pending.borrow_mut() = Some(p);
-                vec![item]
-            }
-            None => Vec::new(),
+        if let Some((p, item)) = self.parse(q.text) {
+            *self.pending.borrow_mut() = Some(p);
+            return vec![item];
+        }
+        let wants = |kind: &str| self.items().map(|i| i.iter().filter(|i| i.subtitle == kind).cloned().collect()).unwrap_or_default();
+        match q.text.trim() {
+            "alias" | "aliases" | "apelidos" | "pseudônimos" | "pseudonimos" => wants("pseudônimo"),
+            "link" | "links" => wants("link rápido"),
+            _ => Vec::new(),
         }
     }
     fn items(&self) -> Option<Rc<Vec<Item>>> {
@@ -141,7 +153,7 @@ impl Provider for Farol {
             .into_iter()
             .map(|(a, t)| Item {
                 id: format!("farol:alias:{a}"),
-                title: format!("{a} → {t}"),
+                title: format!("{a} → {}", self.target_name(&t)),
                 subtitle: "pseudônimo".into(),
                 icon: "ph:at".into(),
                 keywords: format!("alias pseudônimo {a}"),
