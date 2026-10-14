@@ -18,7 +18,7 @@ use crate::engine::{Engine, Providers};
 use crate::item::{Preview, Section};
 use crate::platform;
 use crate::providers::{
-    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, farol::Farol, files::Files, hotkeys::Hotkeys, timers::Timers,
+    apps::Apps, calc::Calc, clipboard::Clipboard, emoji::Emoji, external::External, farol::Farol, files::Files, hotkeys::Hotkeys, timers::Timers,
     web::{Web, WebSearch}, windows::Windows,
 };
 
@@ -103,7 +103,7 @@ pub fn build(inline: bool) -> Result<Core, String> {
     let hotkeys = Rc::new(Hotkeys::new(db.clone()));
     let apps = Rc::new(Apps::new(db.clone()));
     let (switcher, closer) = Windows::pair(apps.clone());
-    let providers: Providers = vec![
+    let mut providers: Providers = vec![
         Rc::new(Calc::new()),
         farol.clone(),
         timers.clone(),
@@ -117,6 +117,14 @@ pub fn build(inline: bool) -> Result<Core, String> {
         clipboard.clone(),
         Rc::new(WebSearch(web)),
     ];
+    // Plugins from the `plugins` setting go before the web search row (not
+    // in `query`: their answers need the service's executor).
+    if !inline {
+        let at = providers.len() - 1;
+        for (i, p) in External::all(&db).into_iter().enumerate() {
+            providers.insert(at + i, Rc::new(p));
+        }
+    }
     let engine = Rc::new(Engine::new(db, providers));
     farol.attach(&engine);
     hotkeys.attach(&engine);

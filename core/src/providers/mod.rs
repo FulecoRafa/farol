@@ -5,6 +5,7 @@ pub mod apps;
 pub mod calc;
 pub mod clipboard;
 pub mod emoji;
+pub mod external;
 pub mod farol;
 pub mod files;
 pub mod hotkeys;
