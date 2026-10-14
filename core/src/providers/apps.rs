@@ -58,6 +58,23 @@ impl Apps {
         };
     }
 
+    /// The app a window belongs to, by its class: the declared
+    /// `StartupWMClass`, else an entry id or reverse-DNS tail equal to it
+    /// (`dev.zed.Zed` → `dev.zed.Zed.desktop`, `firefox` → `firefox.desktop`).
+    pub fn for_window(&self, class: &str) -> Option<(String, String)> {
+        let class = class.to_lowercase();
+        let state = self.state.borrow();
+        let stem = |id: &str| id.trim_end_matches(".desktop").to_lowercase();
+        let tail = |id: &str| stem(id).rsplit('.').next().unwrap_or_default().to_string();
+        let found = state
+            .apps
+            .values()
+            .find(|a| a.wm_class.to_lowercase() == class)
+            .or_else(|| state.apps.values().find(|a| stem(&a.id) == class))
+            .or_else(|| state.apps.values().find(|a| tail(&a.id) == class || stem(&a.id) == tail(&class)))?;
+        Some((found.name.clone(), found.icon.clone()))
+    }
+
     fn app(&self, id: &str) -> Option<App> {
         self.state.borrow().apps.get(id.strip_prefix("apps:")?).cloned()
     }

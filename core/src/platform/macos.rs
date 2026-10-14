@@ -76,6 +76,7 @@ fn bundle(path: &Path) -> App {
         keywords: String::new(),
         icon: if png.exists() { format!("file:{}", png.display()) } else { String::new() },
         exec: vec!["open".into(), "-a".into(), path.to_string_lossy().into_owned()],
+        wm_class: String::new(),
         terminal: false,
     }
 }
@@ -101,4 +102,17 @@ pub fn default_terminal_here() -> Vec<String> {
 
 pub fn default_editor() -> Vec<String> {
     ["open", "-t", "{path}"].map(String::from).to_vec()
+}
+
+/// Open windows: not wired on this OS yet (phase 5 of the plan).
+pub fn windows() -> Vec<super::Window> {
+    Vec::new()
+}
+
+pub fn has_windows() -> bool {
+    false
+}
+
+pub fn window_op(_window: Option<&super::Window>, _op: super::WindowOp) -> std::io::Result<()> {
+    Err(std::io::Error::other("window management is not available on this OS yet"))
 }

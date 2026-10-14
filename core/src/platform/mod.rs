@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 #[cfg(target_os = "linux")]
+pub mod hyprland;
+#[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::*;
@@ -33,6 +35,8 @@ pub struct App {
     /// An image source for the renderer (`icon:name` or `file:/path`).
     pub icon: String,
     pub exec: Vec<String>,
+    /// The window class its windows carry (`StartupWMClass`), when declared.
+    pub wm_class: String,
     pub terminal: bool,
 }
 
@@ -157,4 +161,34 @@ mod tests {
         let p = std::path::Path::new("/home/me/My File#1.pdf");
         assert_eq!(super::file_uri(p), "file:///home/me/My%20File%231.pdf");
     }
+}
+
+/// An open window, for the window plugin.
+#[derive(Clone, Debug, Default)]
+pub struct Window {
+    /// What the window manager calls it (Hyprland: the address).
+    pub id: String,
+    /// Its app: class or app id (`helium`, `com.mitchellh.ghostty`).
+    pub app: String,
+    pub title: String,
+    pub workspace: String,
+    pub pid: i64,
+}
+
+/// Something done to a window: a listed one, or the focused one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum WindowOp {
+    Focus,
+    Close,
+    /// SIGKILL to its process.
+    Kill,
+    Float,
+    Fullscreen,
+    /// On every workspace (floating only).
+    Pin,
+    Center,
+    /// Move to a workspace and follow it.
+    MoveTo(u32),
+    /// Switch to a workspace.
+    GoTo(u32),
 }

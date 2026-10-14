@@ -16,7 +16,7 @@ use tessela_service::{Host, Service, Topic};
 use crate::db::Store;
 use crate::engine::{Engine, Providers};
 use crate::item::{Preview, Section};
-use crate::providers::{apps::Apps, calc::Calc, emoji::Emoji, farol::Farol, files::Files};
+use crate::providers::{apps::Apps, calc::Calc, emoji::Emoji, farol::Farol, files::Files, windows::Windows};
 
 #[derive(Clone, Default, Serialize)]
 pub struct Ui {
@@ -80,10 +80,14 @@ fn set_open(ui: &Topic<Ui>, open: bool, query: String) {
 pub fn build(inline: bool) -> Result<(Service, Rc<Engine>), String> {
     let db = Store::open().map_err(|e| format!("{}: {e}", crate::db::path().display()))?;
     let farol = Rc::new(Farol::new(db.clone()));
+    let apps = Rc::new(Apps::new(db.clone()));
+    let (switcher, closer) = Windows::pair(apps.clone());
     let providers: Providers = vec![
         Rc::new(Calc::new()),
         farol.clone(),
-        Rc::new(Apps::new(db.clone())),
+        apps,
+        Rc::new(switcher),
+        Rc::new(closer),
         Rc::new(Files::new(db.clone(), inline)),
         Rc::new(Emoji::new(db.clone())),
     ];

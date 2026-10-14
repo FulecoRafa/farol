@@ -221,6 +221,7 @@ pub(crate) fn parse_entry(id: &str, text: &str, locale: &[String], desktops: &[S
         keywords,
         icon,
         exec,
+        wm_class: get("StartupWMClass").to_string(),
         terminal: yes("Terminal"),
     })
 }
@@ -321,4 +322,48 @@ mod tests {
         let gnome_only = text.replace("Type=Application", "Type=Application\nOnlyShowIn=GNOME;");
         assert!(parse_entry("x.desktop", &gnome_only, &loc, &["hyprland".into()]).is_none());
     }
+}
+
+/// Open windows, most recent first (Hyprland; empty elsewhere for now).
+pub fn windows() -> Vec<super::Window> {
+    super::hyprland::clients()
+        .into_iter()
+        .map(|c| super::Window { id: c.address, app: c.class, title: c.title, workspace: c.workspace.name, pid: c.pid })
+        .collect()
+}
+
+pub fn has_windows() -> bool {
+    super::hyprland::present()
+}
+
+/// `window` is an id from [`windows`], or `None` for the focused one.
+pub fn window_op(window: Option<&super::Window>, op: super::WindowOp) -> std::io::Result<()> {
+    use super::WindowOp::*;
+    let target = window.map(|w| format!("address:{}", w.id));
+    if let (Kill, Some(w)) = (op, window) {
+        // SAFETY: plain kill(2) on a pid Hyprland reported.
+        return match unsafe { libc_kill(w.pid as i32, 9) } {
+            0 => Ok(()),
+            _ => Err(std::io::Error::last_os_error()),
+        };
+    }
+    let args = match (op, &target) {
+        (Focus, Some(t)) => format!("focuswindow {t}"),
+        (Close, Some(t)) => format!("closewindow {t}"),
+        (Close, None) => "killactive".into(),
+        (Kill, None) => "forcekillactive".into(),
+        (Float, _) => "togglefloating".into(),
+        (Fullscreen, _) => "fullscreen".into(),
+        (Pin, _) => "pin".into(),
+        (Center, _) => "centerwindow".into(),
+        (MoveTo(n), _) => format!("movetoworkspace {n}"),
+        (GoTo(n), _) => format!("workspace {n}"),
+        (Focus, None) | (Kill, Some(_)) => return Ok(()),
+    };
+    super::hyprland::dispatch(&args)
+}
+
+unsafe extern "C" {
+    #[link_name = "kill"]
+    fn libc_kill(pid: i32, sig: i32) -> i32;
 }
