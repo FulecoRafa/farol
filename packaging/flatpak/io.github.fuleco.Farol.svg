@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- farol: a lighthouse and its beam -->
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="#232834"/>
+  <path d="M64 34 L118 20 L118 52 Z" fill="#FFCC66" opacity="0.55"/>
+  <path d="M64 34 L10 20 L10 52 Z" fill="#FFCC66" opacity="0.35"/>
+  <path d="M54 44 h20 l6 62 h-32 z" fill="#E6E1CF"/>
+  <path d="M52 62 h24 l1.6 10 h-27.2 z M49.5 86 h29 l1.4 10 h-31.8 z" fill="#FF6666"/>
+  <rect x="54" y="28" width="20" height="16" rx="3" fill="#FFCC66"/>
+  <path d="M50 28 L64 18 L78 28 Z" fill="#FF6666"/>
+  <rect x="40" y="104" width="48" height="6" rx="3" fill="#5CCFE6"/>
+</svg>

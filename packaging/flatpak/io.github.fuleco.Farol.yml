@@ -1,0 +1,121 @@
+# farol as a Flatpak: the core, the project with adwaita-shell's kit, the
+# tessela runner and the icon font, in one app. Read README.md first: a
+# launcher starts the host's programs, so this sandbox is mostly nominal.
+#
+# Builds tessela (through tessela's own module file) and takes the kit from
+# sibling checkouts: ../tessela and ../adwaita-shell next to this repository.
+id: io.github.fuleco.Farol
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+# No arguments: `farol start`; otherwise the farol CLI (toggle, doctor, ...).
+command: farol-flatpak
+finish-args:
+  # The compositor's own Wayland socket, not --socket=wayland: Flatpak hands
+  # that one out through security-context-v1, and both Hyprland and sway then
+  # hide zwlr_layer_shell_v1 (and other privileged protocols) from the
+  # app, so the launcher could not open. The wrapper points WAYLAND_DISPLAY at
+  # whichever of these exists; another name needs
+  # --filesystem=xdg-run/<name> (README.md).
+  - --filesystem=xdg-run/wayland-0
+  - --filesystem=xdg-run/wayland-1
+  - --device=dri
+  - --share=ipc
+  # Apps, xdg-open, notify-send and wl-copy run on the host through
+  # flatpak-spawn --host (core/src/platform/mod.rs). This is a full sandbox
+  # escape: a launcher's job is to start anything.
+  - --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.Notifications
+  # Hyprland's IPC sockets: windows, workspaces, shortcuts.
+  - --filesystem=xdg-run/hypr
+  # The runner's sockets, shared with the host and with every instance of
+  # the app, so `flatpak run --command=farol io.github.fuleco.Farol toggle`
+  # (a compositor keybinding) reaches the running farol.
+  - --filesystem=xdg-run/tessela:create
+  # File search and previews (read only), the user's desktop entries,
+  # icons, bookmarks and GTK settings under it.
+  - --filesystem=home:ro
+  # Desktop entries and icons of the host and of system-wide Flatpaks.
+  - --filesystem=host-os:ro
+  - --filesystem=/var/lib/flatpak/exports/share:ro
+modules:
+  - ../../../tessela/packaging/flatpak/tessela.yml
+
+  - name: phosphor-icons-fill
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 Phosphor-Fill.ttf -t /app/share/fonts/phosphor
+    sources:
+      - type: file
+        url: https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/Phosphor-Fill.ttf
+        sha256: a53f5d2630cab5e3b7536ecb9d69d71519a2190298c22b1f8d770dd37bc2940a
+
+  # The core (core/, Rust). Its Cargo.toml takes tessela's SDK from
+  # ../../tessela/sdk/rust, so both checkouts go in side by side; crates come
+  # from core-cargo-sources.json (regenerate it when core/Cargo.lock
+  # changes, see README.md).
+  - name: farol-core
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/farol-core/cargo
+        CARGO_NET_OFFLINE: 'true'
+    build-commands:
+      - cargo build --offline --locked --release -j "${FLATPAK_BUILDER_N_JOBS}" --manifest-path farol/core/Cargo.toml
+      # In /app/bin beside tessela: `farol start` finds the runner beside
+      # itself and the project in ../share/farol.
+      - install -Dm755 farol/core/target/release/farol -t /app/bin
+    sources:
+      - type: dir
+        path: ../..
+        dest: farol
+        skip:
+          - .git
+          - result
+          - .flatpak-builder
+          - core/target
+      - type: dir
+        path: ../../../tessela
+        dest: tessela
+        skip:
+          - .git
+          - target
+          - run
+          - result
+          - .flatpak-builder
+      - core-cargo-sources.json
+
+  - name: farol
+    buildsystem: simple
+    build-commands:
+      - install -d /app/share/farol
+      - cp -a tessela.toml src /app/share/farol/
+      - cp -a adwaita-shell-kit /app/share/farol/kit
+      # The service is /app/bin/farol, the kit the copy above.
+      - >-
+        sed -i
+        -e 's|^command = \["core/target/release/farol"\]$|command = ["/app/bin/farol"]|'
+        -e 's|^themes = \["../adwaita-shell/kit/theme.toml"\]$|themes = ["/app/share/farol/kit/theme.toml"]|'
+        -e 's|^kit = "../adwaita-shell/kit"$|kit = "/app/share/farol/kit"|'
+        /app/share/farol/tessela.toml
+      - grep -q '^command = \["/app/bin/farol"\]$' /app/share/farol/tessela.toml
+      - "! grep -q '\\.\\./' /app/share/farol/tessela.toml"
+      - install -Dm755 packaging/flatpak/farol-flatpak.sh /app/bin/farol-flatpak
+      - install -Dm644 packaging/flatpak/io.github.fuleco.Farol.desktop -t /app/share/applications
+      - install -Dm644 packaging/flatpak/io.github.fuleco.Farol.svg -t /app/share/icons/hicolor/scalable/apps
+      - install -Dm644 packaging/flatpak/io.github.fuleco.Farol.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 LICENSE-MIT LICENSE-APACHE -t /app/share/licenses/farol
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - result
+          - .flatpak-builder
+          - core
+      - type: dir
+        path: ../../../adwaita-shell/kit
+        dest: adwaita-shell-kit

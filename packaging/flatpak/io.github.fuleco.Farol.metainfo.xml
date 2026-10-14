@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.fuleco.Farol</id>
+  <name>farol</name>
+  <summary>Launcher for Wayland built with tessela</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <developer id="io.github.fuleco">
+    <name>Fuleco</name>
+  </developer>
+  <description>
+    <p>
+      A launcher written as a tessela project: one resident process that
+      sleeps while closed, a search core in Rust and a TSX surface. It finds
+      apps, does math and unit conversions, emoji, files in the home
+      directory, clipboard history, open windows, timers and alarms, web
+      searches, bookmarks, quicklinks and aliases.
+    </p>
+  </description>
+  <icon type="stock">io.github.fuleco.Farol</icon>
+  <launchable type="desktop-id">io.github.fuleco.Farol.desktop</launchable>
+  <url type="homepage">https://example.invalid/farol</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-14"/>
+  </releases>
+</component>

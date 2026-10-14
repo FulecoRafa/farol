@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=farol
+Comment=Launcher: apps, calculator, files, clipboard, windows and timers
+Exec=farol-flatpak
+Terminal=false
+NoDisplay=true
+Categories=Utility;
+Icon=io.github.fuleco.Farol
