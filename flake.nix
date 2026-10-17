@@ -3,17 +3,12 @@
 
   inputs = {
     # The runner, and the SDK core/ builds against (its source is the
-    # package's src). Local checkouts until both are published; pure
-    # evaluation works because they are locked to commits. Once published,
-    # switch to e.g.
-    #   tessela.url = "github:<owner>/tessela";
-    #   adwaita-shell.url = "github:<owner>/adwaita-shell";
-    # and run `nix flake update tessela adwaita-shell`.
-    tessela.url = "git+file:///home/fuleco/Dev/tessela";
+    # package's src). Local checkouts: --override-input tessela git+file:///...
+    tessela.url = "github:FulecoRafa/tessela";
     nixpkgs.follows = "tessela/nixpkgs";
     # The component kit (kit/, its theme) and the Phosphor icon font.
     adwaita-shell = {
-      url = "git+file:///home/fuleco/Dev/adwaita-shell";
+      url = "github:FulecoRafa/adwaita-shell";
       inputs.tessela.follows = "tessela";
     };
   };

@@ -38,7 +38,8 @@ the same tarball `tessela.rb` builds from) and `adwaita-shell` (its `kit/`).
    `git archive --prefix=farol-0.1.0/ -o farol-0.1.0.tar.gz v0.1.0` (likewise
    the other two).
 2. Set `homepage`, each `url` and each `sha256` (`sha256sum *.tar.gz`) in
-   `farol.rb`; all are placeholders (`https://example.invalid/...`).
+   `farol.rb` (the urls point at release tags, which do not exist yet;
+   the sha256 values are zeros until then).
 3. Put `farol.rb` next to `tessela.rb` in `Formula/` of the tap.
 
 Nothing in the formula depends on `core/Cargo.lock`'s contents: when it

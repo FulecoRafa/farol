@@ -1,5 +1,5 @@
 # Homebrew formula for farol (Linux only), for the same tap as tessela's, e.g.
-#   brew tap <owner>/tessela <git url of a tap repo holding this file>
+#   brew tap FulecoRafa/tessela <git url of a tap repo holding this file>
 #   brew install farol
 # See README.md next to this file for how to release and test it.
 class Farol < Formula
@@ -7,8 +7,8 @@ class Farol < Formula
   # Placeholders until the projects are published: point each `url` at a
   # release tarball (`git archive --prefix=<name>-0.1.0/ -o <name>-0.1.0.tar.gz v0.1.0`)
   # and set each `sha256` to `shasum -a 256 <name>-0.1.0.tar.gz`.
-  homepage "https://example.invalid/farol"
-  url "https://example.invalid/farol/archive/refs/tags/v0.1.0.tar.gz"
+  homepage "https://github.com/FulecoRafa/farol"
+  url "https://github.com/FulecoRafa/farol/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license any_of: ["MIT", "Apache-2.0"]
 
@@ -22,13 +22,13 @@ class Farol < Formula
   # core/Cargo.toml takes tessela's SDK (sdk/rust, a member of tessela's
   # workspace) by path: the same tarball tessela.rb builds from.
   resource "tessela" do
-    url "https://example.invalid/tessela/archive/refs/tags/v0.1.0.tar.gz"
+    url "https://github.com/FulecoRafa/tessela/archive/refs/tags/v0.1.0.tar.gz"
     sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   end
 
   # tessela.toml imports adwaita-shell's kit (components and theme).
   resource "adwaita-shell" do
-    url "https://example.invalid/adwaita-shell/archive/refs/tags/v0.1.0.tar.gz"
+    url "https://github.com/FulecoRafa/adwaita-shell/archive/refs/tags/v0.1.0.tar.gz"
     sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   end
 

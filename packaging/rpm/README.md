@@ -83,7 +83,7 @@ from `%cargo_license_summary`, which the build prints. When
    entry is dropped from `cargo-vendor.txt` (the generator cannot parse it)
    and provided by hand as `bundled(crate(tessela-service))`.
 
-The `URL:` is a provisional placeholder (`https://example.invalid/farol`).
+The `URL:` is a provisional placeholder (`https://github.com/FulecoRafa/farol`).
 
 ## Verified
 

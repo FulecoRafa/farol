@@ -76,7 +76,7 @@ flatpak run io.github.fuleco.Farol toggle            # any other argument: the f
 **Homebrew** (Linux only, a tap next to tessela's formula):
 
 ```sh
-brew install <owner>/tessela/farol
+brew install FulecoRafa/tessela/farol
 farol autostart on && farol start
 ```
 

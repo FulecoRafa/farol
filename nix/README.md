@@ -14,10 +14,10 @@
 
 Inputs: `tessela` (the runner; the core builds on its SDK, `sdk/rust`, from
 the same source) and `adwaita-shell` (its `kit/`, and the Phosphor font),
-both `git+file:` sibling checkouts locked to commits, with
+both on GitHub (`github:FulecoRafa/...`) locked to commits, with
 `adwaita-shell.inputs.tessela.follows = "tessela"`. Taking newer commits:
-`nix flake update tessela adwaita-shell`; trying uncommitted work:
-`--override-input tessela path:/home/fuleco/Dev/tessela`.
+`nix flake update tessela adwaita-shell`; trying local work:
+`--override-input tessela path:/path/to/tessela`.
 
 ## The package
 
@@ -45,7 +45,7 @@ that bound them; after an upgrade, restart farol (the service does on
 
 ```nix
 # flake inputs
-farol.url = "git+file:///home/fuleco/Dev/farol";
+farol.url = "github:FulecoRafa/farol";
 
 # a home-manager module
 imports = [ inputs.farol.homeManagerModules.default ];

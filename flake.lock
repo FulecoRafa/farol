@@ -12,17 +12,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1791984467,
-        "narHash": "sha256-Eyidp/5G4WboNIkOOtCTjeNktBc9WWLz/RZbOHvFleU=",
-        "ref": "refs/heads/master",
-        "rev": "5075261c527e4587cde32d7ba09c244cab82690d",
-        "revCount": 42,
-        "type": "git",
-        "url": "file:///home/fuleco/Dev/adwaita-shell"
+        "lastModified": 1792257773,
+        "narHash": "sha256-eDItsSpa11uIsMedAYc/AAmbtQt29WniaZ+JFgdGmQ8=",
+        "owner": "FulecoRafa",
+        "repo": "adwaita-shell",
+        "rev": "bb0c66698f98530467b3ca67b4074dc2d3a839f4",
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "file:///home/fuleco/Dev/adwaita-shell"
+        "owner": "FulecoRafa",
+        "repo": "adwaita-shell",
+        "type": "github"
       }
     },
     "nixpkgs": {
@@ -53,17 +53,17 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1791989417,
-        "narHash": "sha256-DSBTlte9OTJ1AjnBtXnu5uQUsE58Vr4Zkky0dmi8CEU=",
-        "ref": "refs/heads/master",
-        "rev": "d6093e4c8aa4e4563ab385ab7198d3d9c70c9959",
-        "revCount": 85,
-        "type": "git",
-        "url": "file:///home/fuleco/Dev/tessela"
+        "lastModified": 1791991861,
+        "narHash": "sha256-adQvYX2CMg3Bhu1LuMiIvWyjuvZGgY/qlsZTh+0jhSQ=",
+        "owner": "FulecoRafa",
+        "repo": "tessela",
+        "rev": "628272691106cf90a0e98210c216756a594d78cb",
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "file:///home/fuleco/Dev/tessela"
+        "owner": "FulecoRafa",
+        "repo": "tessela",
+        "type": "github"
       }
     }
   },
