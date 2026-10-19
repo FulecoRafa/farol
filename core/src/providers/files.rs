@@ -101,6 +101,12 @@ fn tilde(p: &Path) -> String {
     }
 }
 
+/// macOS keeps the system's own data in the home, not hidden: `~/Library`
+/// alone holds more entries than the rest of a home.
+fn system_dir(e: &ignore::DirEntry) -> bool {
+    cfg!(target_os = "macos") && e.depth() == 1 && e.file_name() == "Library"
+}
+
 fn walk(roots: &[PathBuf], text: &str, hidden: bool, stale: &dyn Fn() -> bool) -> Vec<Hit> {
     let q = fold(text.trim());
     let by_path = q.contains('/');
@@ -115,7 +121,7 @@ fn walk(roots: &[PathBuf], text: &str, hidden: bool, stale: &dyn Fn() -> bool) -
             .require_git(false)
             .follow_links(false)
             .max_depth(Some(16))
-            .filter_entry(|e| !matches!(e.file_name().to_str(), Some("node_modules" | ".git" | "target")))
+            .filter_entry(|e| !matches!(e.file_name().to_str(), Some("node_modules" | ".git" | "target")) && !system_dir(e))
             .build();
         for (n, entry) in walker.flatten().enumerate() {
             if n % 256 == 0 && stale() {
