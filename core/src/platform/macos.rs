@@ -2,7 +2,8 @@
 
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
 
 use super::{App, home};
@@ -73,20 +74,87 @@ pub fn apps() -> Vec<App> {
         }
     }
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    convert_icons(out.iter().map(|a| PathBuf::from(&a.id)).collect());
     out
+}
+
+fn icons_dir() -> PathBuf {
+    cache_dir().join("farol").join("icons")
+}
+
+/// Where a bundle's icon goes as a PNG, named after the bundle's path.
+fn icon_png(bundle: &Path) -> PathBuf {
+    let name: String = bundle
+        .to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c } else { '_' })
+        .collect();
+    icons_dir().join(format!("{}.png", name.trim_start_matches('_')))
+}
+
+/// Bundles ship their icon as `.icns`, which the renderer does not decode:
+/// `sips` turns each into a PNG in the cache, off the service thread, once
+/// per icon (again when the bundle's Info.plist is newer, as after an
+/// update). Rows point at the PNGs already, and the renderer shows each as
+/// soon as it exists.
+fn convert_icons(bundles: Vec<PathBuf>) {
+    static RUNNING: AtomicBool = AtomicBool::new(false);
+    let modified = |p: &Path| p.metadata().and_then(|m| m.modified()).ok();
+    let stale: Vec<PathBuf> = bundles
+        .into_iter()
+        .filter(|b| {
+            let png = modified(&icon_png(b));
+            png.is_none() || png < modified(&b.join("Contents/Info.plist"))
+        })
+        .collect();
+    if stale.is_empty() || RUNNING.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let _ = std::fs::create_dir_all(icons_dir());
+    std::thread::spawn(move || {
+        for b in stale {
+            if let Some(icns) = icns(&b) {
+                let _ = Command::new("sips")
+                    .args(["-s", "format", "png", "-Z", "128"])
+                    .arg(&icns)
+                    .arg("--out")
+                    .arg(icon_png(&b))
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+            }
+        }
+        RUNNING.store(false, Ordering::Release);
+    });
+}
+
+/// The bundle's `.icns`: `CFBundleIconFile` from its Info.plist (XML or
+/// binary, so through `plutil`), with or without the extension.
+fn icns(bundle: &Path) -> Option<PathBuf> {
+    let out = Command::new("plutil")
+        .args(["-extract", "CFBundleIconFile", "raw", "-o", "-"])
+        .arg(bundle.join("Contents/Info.plist"))
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    let name = String::from_utf8(out.stdout).ok()?;
+    let name = name.trim();
+    if !out.status.success() || name.is_empty() {
+        return None;
+    }
+    let file = bundle.join("Contents/Resources").join(name);
+    let file = if file.extension().is_some_and(|e| e == "icns") { file } else { file.with_extension("icns") };
+    file.is_file().then_some(file)
 }
 
 fn bundle(path: &Path) -> App {
     let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    // A PNG next to the bundle's icon, when the bundle ships one; .icns is
-    // not something the renderer decodes.
-    let png = path.join("Contents/Resources/AppIcon.png");
     App {
         id: path.to_string_lossy().into_owned(),
         name,
         comment: String::new(),
         keywords: String::new(),
-        icon: if png.exists() { format!("file:{}", png.display()) } else { String::new() },
+        icon: format!("file:{}", icon_png(path).display()),
         exec: vec!["open".into(), "-a".into(), path.to_string_lossy().into_owned()],
         wm_class: String::new(),
         terminal: false,
