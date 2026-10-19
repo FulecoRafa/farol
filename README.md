@@ -133,7 +133,10 @@ captures the window. Plugins: see `core/src/providers/external.rs` and
 
 ## Platforms
 
-Linux (Wayland, Hyprland for windows and shortcuts) is complete. The core
-has macOS and Windows code paths for apps, opening, copying, files and
-notifications; windows, shortcuts and the clipboard watcher are not wired
-there yet, and tessela itself still needs its port (plan, phase 5).
+Linux (Wayland, Hyprland for windows and shortcuts) is complete. On macOS
+farol runs from a checkout (tessela's `macos` branch, with adwaita-shell
+beside it, and the Phosphor-Fill font installed): surfaces are floating
+panels, apps come with their icons, and opening, copying, files and
+notifications work. Windows, global shortcuts (bind `farol toggle` with
+Shortcuts or skhd meanwhile) and the clipboard watcher are not wired there
+yet; Windows has the core's code paths only (plan, phase 5).
